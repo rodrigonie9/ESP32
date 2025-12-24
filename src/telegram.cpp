@@ -4,12 +4,10 @@
 #include "telegram.h"        // Header do Telegram
 #include "wifi_config.h"
 #include "debug.h"
+#include "secrets.h"
+
 
 // ====================== DADOS DO TELEGRAM ======================
-
-// Token do bot do Telegram
-const char* botToken = "7963934643:AAEaVDm7FfoyEGXuTCVLar_5gJEvXWXhOsw";
-
 // Lista de Chat IDs
 const char* chatIDs[] = {
   "913490344",     // Rodrigo
@@ -19,6 +17,99 @@ const char* chatIDs[] = {
 
 // Quantidade total de chats cadastrados
 const int TOTAL_CHATS = sizeof(chatIDs) / sizeof(chatIDs[0]);
+
+
+// ====================== VARIÁVEIS OTA =======================
+// Intervalo de verificação do Telegram Status Update(em ms)
+// usa intervalo para que não cheque a internet nem acesse o telegram com muita frequencia
+#define INTERVALO_TELEGRAM 60000
+// Guarda o último momento da verificação
+static unsigned long ultimoCheckTelegram = 0;
+
+// Guarda o último update_id processado
+static long ultimoUpdateID = 0;
+
+// Flag interna que sinaliza pedido de OTA
+static bool pedidoOTA = false;
+
+
+
+
+// ====================== FUNÇÕES UPDATE OTA TELEGRAM ==========
+// Função que verifica se chegou comando /update no Telegram
+void verificarMensagensTelegram() {
+
+  //verifica se já passou o intervalo
+  // não queremos API do Telegram nem consultar internet com muita frequencia
+ if (millis() - ultimoCheckTelegram < INTERVALO_TELEGRAM) {
+    return; // Ainda não é hora de verificar
+  }
+  // atualiza tempo da última verificação
+  ultimoCheckTelegram = millis();
+  
+  // Verifica se tem internet
+  if (!internetDisponivel()) {
+    return;
+  }
+
+  HTTPClient http;
+
+  // Monta a URL da API getUpdates
+  String url = "https://api.telegram.org/bot";
+  url += TELEGRAM_BOT_TOKEN;
+  url += "/getUpdates?offset=";
+  url += String(ultimoUpdateID + 1);
+
+  http.begin(url);
+  int httpCode = http.GET();
+
+  if (httpCode != 200) {
+    http.end();
+    return;
+  }
+
+  String payload = http.getString();
+  http.end();
+
+if (!pedidoOTA &&
+      payload.indexOf(CHAT_AUTORIZADO) != -1 &&
+      payload.indexOf("/update") != -1) {
+
+  pedidoOTA = true;
+  enviarMensagemTelegram("Comando /update recebido. Iniciando OTA...");
+}
+
+  // Atualiza o último update_id (simples e seguro)
+  int pos = payload.lastIndexOf("\"update_id\":");
+  if (pos != -1) {
+    ultimoUpdateID = payload.substring(pos + 12).toInt();
+  }
+}
+
+// Função que informa ao main.cpp se o comando /update foi recebido
+bool comandoAtualizarRecebido() {
+
+  // Se houve pedido de OTA
+  if (pedidoOTA) {
+
+    pedidoOTA = false;
+    // Limpa a flag para não repetir a atualização
+
+    return true;
+    // Informa ao main.cpp que deve iniciar OTA
+  }
+
+  return false;
+  // Nenhum pedido de OTA pendente
+}
+
+void cancelarPedidoOTA() {
+  pedidoOTA = false;
+}
+
+
+
+
 
 // ====================== FUNÇÃO TELEGRAM ======================
 
@@ -44,7 +135,7 @@ void enviarMensagemTelegram(String mensagem) {
 
     // Monta a URL da API do Telegram
     String url = "https://api.telegram.org/bot";
-    url += botToken;
+    url += TELEGRAM_BOT_TOKEN;
     url += "/sendMessage?chat_id=";
     url += chatIDs[i];
     url += "&text=";
@@ -66,3 +157,6 @@ void enviarMensagemTelegram(String mensagem) {
     delay(500);                    // Evita bloqueio da API
   }
 }
+
+
+

@@ -18,4 +18,10 @@
 // Função responsável por enviar mensagens via Telegram
 void enviarMensagemTelegram(String mensagem);
 
+//Funções OTA
+// Verifica mensagens do Telegram (getUpdates)
+void verificarMensagensTelegram();
+// Retorna true se o comando /update foi recebido
+bool comandoAtualizarRecebido();
+
 #endif

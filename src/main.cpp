@@ -10,6 +10,18 @@
 #include "debug.h"
 #include "wifi_config.h"
 #include "telegram.h"
+#include "ota_http.h"
+
+//  ==================== OTA Git Hub ===================
+// atualizar firmware via ota
+
+// URL do firmware no GitHub
+const char* URL_FIRMWARE =
+"https://github.com/rodrigonie9/ESP32/raw/refs/heads/main/firmware/controle_temperatura_v1.bin";
+
+// Flag que indica pedido de atualização
+bool solicitarOTA = false;
+
 
 
 // ====================== DS18B20 ======================
@@ -69,6 +81,27 @@ void setup() {
 
 void loop() {
 
+  // ===================== ATUALIZAÇÃO FIRMWARE =====================
+  // Verifica mensagens do Telegram
+  verificarMensagensTelegram();
+  // Essa função é rápida e não bloqueia
+
+  // Verifica se foi solicitado OTA
+  if (comandoAtualizarRecebido()) {
+    solicitarOTA = true;
+  }
+
+  if (solicitarOTA) {
+    LOG("Iniciando atualização OTA...");
+    enviarMensagemTelegram("Atualização de OTA iniciando agora");
+    delay(500); //tempo enviar msg, liberar sockets https, estabiizar wifi
+    atualizarFirmwareOTA(URL_FIRMWARE);
+    solicitarOTA = false;
+    // Se OTA iniciar com sucesso, a ESP32 reinicia
+    // Se falhar, continua rodando firmware atual
+  }
+
+  // ===================== LEITURA TEMPERATURA ======================
   // Verifica se já passou o intervalo definido
   if (millis() - ultimoEnvio >= INTERVALO) {
 
@@ -109,4 +142,8 @@ void loop() {
     // Atualiza o tempo do último envio
     ultimoEnvio = millis();
   }
+
+  // pequeno delay para aliviar o cpu
+  delay(50);
+
 }
