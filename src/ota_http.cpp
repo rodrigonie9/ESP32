@@ -12,7 +12,7 @@ bool atualizarFirmwareOTA(const char* urlFirmware) {
   if (!internetDisponivel()) {
     // ! = negação de lógica > !true > false , !false > true
     // se não tem internet, cai dentro do If
-    return; // Sai da função
+    return false; // Sai da função, 
   }
 
   HTTPClient http;

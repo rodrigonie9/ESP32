@@ -17,7 +17,7 @@
 
 // URL do firmware no GitHub
 const char* URL_FIRMWARE =
-"https://github.com/rodrigonie9/ESP32/raw/refs/heads/main/firmware/controle_temperatura_v1.bin";
+"https://raw.githubusercontent.com/rodrigonie9/ESP32/main/firmware/controle_temperatura_v1.bin";
 
 // Flag que indica pedido de atualização
 bool solicitarOTA = false;
@@ -103,7 +103,9 @@ void loop() {
 
   // ===================== LEITURA TEMPERATURA ======================
   // Verifica se já passou o intervalo definido
-  if (millis() - ultimoEnvio >= INTERVALO) {
+  if (!solicitarOTA && millis() - ultimoEnvio >= INTERVALO) {
+    // confere se não está atualizando firmware (solicitarOTA = true)
+    // confere o tempo de 15minutos
 
     // Solicita leitura de todos os sensores
     sensores.requestTemperatures();
