@@ -17,12 +17,12 @@
 //
 // COMO FUNCIONA O OTA:
 //
-// 1. Compile o projeto normalmente (PlatformIO -> Build)
+// 1. SALVAR > depois Compile o projeto normalmente (PlatformIO -> Build)
 //    → será gerado o arquivo:
 //      .pio/build/esp32dev/firmware.bin
 //
 //   → colar o firmware.bin para a pasta firmware dentro da pasta main
-//     → renomear para controle_temperatura_v1.bin (nome correto do raw no github)
+//     → renomear para firmware.bin (nome correto do raw no github)
 //       → esse nome é que esta neste link do github para placa buscar e atalizar o firmare  
 //  
 // 2. Crie uma nova Release no GitHub:
@@ -44,7 +44,7 @@
 
 // URL do firmware no GitHub
 const char* URL_FIRMWARE =
-"https://raw.githubusercontent.com/rodrigonie9/ESP32/main/firmware/controle_temperatura_v1.bin";
+"https://raw.githubusercontent.com/rodrigonie9/ESP32/main/firmware/firmware.bin";
 
 // Flag que indica pedido de atualização
 bool solicitarOTA = false;
@@ -62,7 +62,7 @@ DallasTemperature sensores(&oneWire);
 
 // ====================== CONTROLE DE TEMPO ======================
 unsigned long ultimoEnvio = 0;              // Guarda o tempo do último envio
-const unsigned long INTERVALO = 90000;      //  
+const unsigned long INTERVALO = 60000;      //  
 
 
 
@@ -102,7 +102,7 @@ void setup() {
   snprintf(
     mensagem_inicial,
     sizeof(mensagem_inicial),
-    "%d de %d sensores de temperaturas ativos",
+    "%d de %d sensores de temperaturas ativos NOVO FIRMWARE",
     qtd,    // número de sensores ativos
     2       // total de sensores instalados
   );
