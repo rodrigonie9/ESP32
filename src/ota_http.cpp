@@ -1,3 +1,22 @@
+// ============================================================================
+// Função: atualizarFirmwareOTA
+//
+// Responsável por:
+// - Baixar o firmware (.bin) via HTTP/HTTPS
+// - Gravar o firmware na partição OTA
+// - Validar a gravação
+// - Reiniciar a ESP32 para rodar o novo firmware
+//
+// Segurança:
+// - Verifica acesso à internet antes de iniciar
+// - Não apaga o firmware atual se a atualização falhar
+// - Usa partições OTA (sem risco de brick)
+//
+// Retorno:
+// - true  -> OTA iniciado com sucesso (ESP reinicia)
+// - false -> Falha (firmware atual continua rodando)
+// ============================================================================
+
 #include "ota_http.h"
 #include "wifi_config.h"
 

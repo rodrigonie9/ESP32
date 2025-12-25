@@ -12,8 +12,31 @@
 #include "telegram.h"
 #include "ota_http.h"
 
-//  ==================== OTA Git Hub ===================
-// atualizar firmware via ota
+// ============================================================================
+// ======================== ATUALIZAÇÃO OTA (HTTP) ============================
+//
+// COMO FUNCIONA O OTA:
+//
+// 1. Compile o projeto normalmente (PlatformIO -> Build)
+//    → será gerado o arquivo:
+//      .pio/build/esp32dev/firmware.bin
+//
+// 2. Crie uma nova Release no GitHub:
+//    - Tag: vX.Y.Z  (ex: v1.1.0)
+//    - Anexe o arquivo firmware.bin
+//
+// 3. A URL abaixo deve apontar para o arquivo da Release:
+//    https://raw.githubusercontent.com/<usuario>/<github_path>/<nome_do_firmware>"
+// 4. Para iniciar a atualização:
+//    - Envie o comando /update no Telegram
+//    - Apenas o CHAT_AUTORIZADO pode solicitar
+//
+// OBSERVAÇÕES IMPORTANTES:
+// - A pasta .pio NÃO deve ser enviada ao GitHub
+// - O OTA só ocorre quando solicitado (não é automático)
+// - Em caso de falha, o firmware atual continua rodando
+//
+// ============================================================================
 
 // URL do firmware no GitHub
 const char* URL_FIRMWARE =
@@ -21,7 +44,6 @@ const char* URL_FIRMWARE =
 
 // Flag que indica pedido de atualização
 bool solicitarOTA = false;
-
 
 
 // ====================== DS18B20 ======================

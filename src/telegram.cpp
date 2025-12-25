@@ -1,3 +1,5 @@
+
+
 #include <WiFi.h>            // Necessário para verificar conexão
 #include <HTTPClient.h>      // Cliente HTTP
 
@@ -36,6 +38,23 @@ static bool pedidoOTA = false;
 
 
 // ====================== FUNÇÕES UPDATE OTA TELEGRAM ==========
+
+// ============================================================================
+// Verifica comandos recebidos via Telegram
+//
+// Comando suportado:
+// - /update
+//
+// Regras de segurança:
+// - Apenas mensagens vindas do CHAT_AUTORIZADO são aceitas
+// - O comando apenas sinaliza o OTA (não executa aqui)
+// - A execução real do OTA ocorre no main.cpp
+//
+// A verificação é feita em intervalos para evitar:
+// - excesso de chamadas à API do Telegram
+// - consumo desnecessário de internet
+// ============================================================================
+
 // Função que verifica se chegou comando /update no Telegram
 void verificarMensagensTelegram() {
 
