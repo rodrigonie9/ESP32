@@ -62,7 +62,7 @@ DallasTemperature sensores(&oneWire);
 
 // ====================== CONTROLE DE TEMPO ======================
 unsigned long ultimoEnvio = 0;              // Guarda o tempo do último envio
-const unsigned long INTERVALO = 60000;      //  
+const unsigned long INTERVALO = 120000;      //  
 
 
 
@@ -102,7 +102,7 @@ void setup() {
   snprintf(
     mensagem_inicial,
     sizeof(mensagem_inicial),
-    "%d de %d sensores de temperaturas ativos NOVO FIRMWARE",
+    "%d de %d sensores de temperaturas ativos RODRIGO",
     qtd,    // número de sensores ativos
     2       // total de sensores instalados
   );
