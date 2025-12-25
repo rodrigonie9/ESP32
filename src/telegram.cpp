@@ -1,4 +1,6 @@
 
+#include <Preferences.h>     // acessar nvs (memória placa para salva ultimo id_chat telegram)
+Preferences prefs;           // objeto responsável acessar NVS (flash interna)
 
 #include <WiFi.h>            // Necessário para verificar conexão
 #include <HTTPClient.h>      // Cliente HTTP
@@ -56,9 +58,30 @@ static bool pedidoOTA = false;
 // - consumo desnecessário de internet
 // ============================================================================
 
+// ============================================================================
+// Inicializa a NVS do Telegram
+// Deve ser chamada UMA VEZ no boot
+// ============================================================================
+void iniciarTelegramNVS() {
+
+  prefs.begin("telegram", false);
+  // Abre a gaveta (namespace) "telegram" na NVS
+  // false = leitura e escrita
+
+  ultimoUpdateID = prefs.getLong("lastUpdate", 0);
+  // Lê da NVS o último update_id salvo
+  // Se não existir ainda, assume 0
+
+  prefs.end();
+  // Fecha a NVS
+}
+
+
+
+
 // Função que verifica se chegou comando /update no Telegram
 void verificarMensagensTelegram() {
-
+ 
   //verifica se já passou o intervalo
   // não queremos API do Telegram nem consultar internet com muita frequencia
  if (millis() - ultimoCheckTelegram < INTERVALO_TELEGRAM) {
@@ -78,7 +101,7 @@ void verificarMensagensTelegram() {
   String url = "https://api.telegram.org/bot";
   url += TELEGRAM_BOT_TOKEN;
   url += "/getUpdates?offset=";
-  url += String(ultimoUpdateID + 1);
+  url += String(ultimoUpdateID + 1);      // pede um mais nova que a última processada
 
   http.begin(url);
   int httpCode = http.GET();
@@ -99,11 +122,20 @@ if (!pedidoOTA &&
   enviarMensagemTelegram("Comando /update recebido. Iniciando OTA...");
 }
 
-  // Atualiza o último update_id (simples e seguro)
+  // procura último "update_id" para o número
   int pos = payload.lastIndexOf("\"update_id\":");
   if (pos != -1) {
+    // converte o valor do update_id para número
     ultimoUpdateID = payload.substring(pos + 12).toInt();
+
+    //salva o update_id na NVS
+    // após o reboot, esp32, lembra que já prcessou essa mensagem
+    prefs.begin("telegram", false);
+    prefs.putLong("lastUpdate", ultimoUpdateID);
+    //fecha NVS telegra
+    prefs.end(); 
   }
+
 }
 
 // Função que informa ao main.cpp se o comando /update foi recebido

@@ -78,7 +78,11 @@ void setup() {
   conectarWiFi();
   LOG("WiFi Conectado");
 
-// ====================== INICIA SENSORES ======================
+  // ====================== INICIA TELEGRAM =====================
+  // pega na NVS úlitmo ID de mensagem do telegram, com a mensagem /update
+  iniciarTelegramNVS();
+
+  // ====================== INICIA SENSORES ======================
   sensores.begin();
 
   // Conta quantos sensores existem no barramento

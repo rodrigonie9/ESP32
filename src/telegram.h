@@ -23,5 +23,8 @@ void enviarMensagemTelegram(String mensagem);
 void verificarMensagensTelegram();
 // Retorna true se o comando /update foi recebido
 bool comandoAtualizarRecebido();
+// pega ultimo id da VNS (flash) e coloca na ram 
+void iniciarTelegramNVS();
+
 
 #endif
