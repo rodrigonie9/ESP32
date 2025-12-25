@@ -29,6 +29,7 @@ const int TOTAL_CHATS = sizeof(chatIDs) / sizeof(chatIDs[0]);
 static unsigned long ultimoCheckTelegram = 0;
 
 // Guarda o último update_id processado
+// cada mensagem do telegram tem um ID
 static long ultimoUpdateID = 0;
 
 // Flag interna que sinaliza pedido de OTA

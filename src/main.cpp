@@ -21,6 +21,10 @@
 //    → será gerado o arquivo:
 //      .pio/build/esp32dev/firmware.bin
 //
+//   → colar o firmware.bin para a pasta firmware dentro da pasta main
+//     → renomear para controle_temperatura_v1.bin (nome correto do raw no github)
+//       → esse nome é que esta neste link do github para placa buscar e atalizar o firmare  
+//  
 // 2. Crie uma nova Release no GitHub:
 //    - Tag: vX.Y.Z  (ex: v1.1.0)
 //    - Anexe o arquivo firmware.bin
@@ -58,7 +62,7 @@ DallasTemperature sensores(&oneWire);
 
 // ====================== CONTROLE DE TEMPO ======================
 unsigned long ultimoEnvio = 0;              // Guarda o tempo do último envio
-const unsigned long INTERVALO = 900000;      //  
+const unsigned long INTERVALO = 90000;      //  
 
 
 
