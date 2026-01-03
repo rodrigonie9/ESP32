@@ -8,9 +8,9 @@
 
 // Módulos do Projeto
 #include "debug.h"
-#include "wifi_config.h"
-#include "telegram.h"
-#include "ota_http.h"
+#include "wifi_config/wifi_config.h"
+#include "telegram/telegram.h"
+#include "ota/ota_http.h"
 
 // ============================================================================
 // ======================== ATUALIZAÇÃO OTA (HTTP) ============================

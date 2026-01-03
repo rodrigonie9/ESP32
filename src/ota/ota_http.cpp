@@ -18,7 +18,7 @@
 // ============================================================================
 
 #include "ota_http.h"
-#include "wifi_config.h"
+#include "wifi_config/wifi_config.h"
 
 #include <WiFi.h>        // Controle do Wi-Fi
 #include <HTTPClient.h> // Cliente HTTP
