@@ -11,6 +11,7 @@
 #include "wifi_config/wifi_config.h"
 #include "telegram/telegram.h"
 #include "ota/ota_http.h"
+#include "web/web_portal.h"
 
 // ============================================================================
 // ======================== ATUALIZAÇÃO OTA (HTTP) ============================
@@ -78,6 +79,9 @@ void setup() {
   conectarWiFi();
   LOG("WiFi Conectado");
 
+  // ====================== INICIAR WEB PORTAL ======================
+  iniciarWebPortal();
+
   // ====================== INICIA TELEGRAM =====================
   // pega na NVS úlitmo ID de mensagem do telegram, com a mensagem /update
   iniciarTelegramNVS();
@@ -110,6 +114,8 @@ void setup() {
 }
 
 void loop() {
+  // ====================== PORTAL WEB ======================
+  webPortalLoop();
 
   // ===================== ATUALIZAÇÃO FIRMWARE =====================
   // Verifica mensagens do Telegram

@@ -6,7 +6,7 @@ Preferences prefs;           // objeto responsável acessar NVS (flash interna)
 #include <HTTPClient.h>      // Cliente HTTP
 
 #include "telegram.h"        // Header do Telegram
-#include "wifi_config.h"
+#include "wifi_config/wifi_config.h"
 #include "debug.h"
 #include "secrets.h"
 
