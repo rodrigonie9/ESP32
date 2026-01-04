@@ -1,6 +1,6 @@
 
-#include <Preferences.h>     // acessar nvs (memória placa para salva ultimo id_chat telegram)
-Preferences prefs;           // objeto responsável acessar NVS (flash interna)
+#include <Preferences.h>            // acessar nvs (memória placa para salva ultimo id_chat telegram)
+static Preferences prefsTelegram;   // objeto responsável acessar NVS (flash interna)
 
 #include <WiFi.h>            // Necessário para verificar conexão
 #include <HTTPClient.h>      // Cliente HTTP
@@ -64,15 +64,15 @@ static bool pedidoOTA = false;
 // ============================================================================
 void iniciarTelegramNVS() {
 
-  prefs.begin("telegram", false);
+  prefsTelegram.begin("telegram", false);
   // Abre a gaveta (namespace) "telegram" na NVS
   // false = leitura e escrita
 
-  ultimoUpdateID = prefs.getLong("lastUpdate", 0);
+  ultimoUpdateID = prefsTelegram.getLong("lastUpdate", 0);
   // Lê da NVS o último update_id salvo
   // Se não existir ainda, assume 0
 
-  prefs.end();
+  prefsTelegram.end();
   // Fecha a NVS
 }
 
@@ -130,10 +130,10 @@ if (!pedidoOTA &&
 
     //salva o update_id na NVS
     // após o reboot, esp32, lembra que já prcessou essa mensagem
-    prefs.begin("telegram", false);
-    prefs.putLong("lastUpdate", ultimoUpdateID);
+    prefsTelegram.begin("telegram", false);
+    prefsTelegram.putLong("lastUpdate", ultimoUpdateID);
     //fecha NVS telegra
-    prefs.end(); 
+    prefsTelegram.end(); 
   }
 
 }

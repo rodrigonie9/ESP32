@@ -1,10 +1,10 @@
-#ifndef WEB_PORTAL_H
-#define WEB_PORTAL_H
+#pragma once
+#include <Arduino.h>
 
-//Função para iniciar o portal web
+// Inicializa o servidor web
+// Deve ser chamada no setup()
 void iniciarWebPortal();
 
-//Função que deve ser chamada no loop
+// Deve ser chamada no loop()
+// Mantém o servidor web ativo
 void webPortalLoop();
-
-#endif
