@@ -58,23 +58,24 @@ void handleRoot() {
 
     html += "<table>";
 
-    // ====== CABEÇALHO DA TABELA ======
+        // ====== CABEÇALHO DA TABELA ======
     html += "<tr>";
     html += "<th>#</th>";
     html += "<th>ID do Sensor</th>";
-    html += "<th>Temp (°C)</th>";
-    html += "<th>Erros</th>";
+    html += "<th>Temperatura (°C)</th>";
+    html += "<th>Leituras OK</th>";
+    html += "<th>Leituras ERRO</th>";
     html += "</tr>";
 
     for (uint8_t i = 0; i < total; i++) {
 
-      // ======  BUSCA DADOS DO SENSOR ======
+      // Busca dados já medidos pelo loop principal
+      float temp = getUltimaTemperatura(i);
       SensorStats s = getSensorStats(i);
-      float temp = getTemperatura(i);
 
       html += "<tr>";
 
-      // Índice
+      // Índice do sensor
       html += "<td>";
       html += String(i);
       html += "</td>";
@@ -84,18 +85,23 @@ void handleRoot() {
       html += getSensorID(i);
       html += "</td>";
 
-      // ======  TEMPERATURA ======
+      // Temperatura
       html += "<td>";
-      if (temp == DEVICE_DISCONNECTED_C) {
-        html += "ERRO";
+      if (s.ultimo_erro) {
+        html += "<span style='color:red;'>ERRO</span>";
       } else {
         html += String(temp, 1);
       }
       html += "</td>";
 
-      // ====== CONTADOR DE ERROS ======
+      // Leituras OK
       html += "<td>";
-      html += String(s.erros);
+      html += String(s.leituras_ok);
+      html += "</td>";
+
+      // Leituras com erro
+      html += "<td>";
+      html += String(s.leituras_erro);
       html += "</td>";
 
       html += "</tr>";

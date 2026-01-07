@@ -6,7 +6,9 @@
 // ================= CONFIGURAÇÃO =================
 #define PINO_DATA 18  // GPIO onde os sensores estão ligados
 
-static SensorStats stats[20]; // Suporta até 20 sensores
+static SensorStats stats[20];         // Suporta até 20 sensores
+static float ultimaTemperatura[20];    // 
+
 
 static OneWire oneWire(PINO_DATA);
 static DallasTemperature sensores(&oneWire);
@@ -24,9 +26,10 @@ void iniciarSensores() {
 
   // Zera estatísticas dos sensores
   for (uint8_t i= 0; i < totalSensores; i++) {
-    stats[i].leiturasOK = 0;
-    stats[i].erros = 0; 
-    stats[i].ultimoErroMs = 0;  
+    stats[i].leituras_ok = 0;
+    stats[i].leituras_erro = 0; 
+    stats[i].ultima_temp = 0;
+    stats[i].ultimo_erro = false;  
   }
 
 }
@@ -59,35 +62,44 @@ String getSensorID(uint8_t index) {
 }
 
 
-// Retorna a temperatura de um sensor pelo índice
-float getTemperatura(uint8_t index) {
+// Função para ler temperaturas
+void atualizarSensores(){
 
-  //Primeira tentativa
-  float temp = sensores.getTempCByIndex(index);
+  sensores.requestTemperatures();
 
-  // Se falhou, tenta uma segunda vez
-  if (temp == DEVICE_DISCONNECTED_C) {
-    stats[index].erros++; 
-    stats[index].ultimoErroMs = millis();
+  for (uint8_t i = 0; i < totalSensores; i++){
 
-    // pequeno atraso para estabilizar o barramento
-    delay(50);
+    // Primeira tentativa
+    float temp = sensores.getTempCByIndex(i);
 
-    //solicita nova leitura
-    sensores.requestTemperatures();
+    // Segunda tentativa
+    if (temp == DEVICE_DISCONNECTED_C){
+      delay(10);
+      
+      sensores.requestTemperatures();
 
-    //segunda tentativa
-    temp = sensores.getTempCByIndex(index);
-
-    //Se falhou de novo, retorna erro
-    if (temp == DEVICE_DISCONNECTED_C) {
-      return temp;
+      temp = sensores.getTempCByIndex(i);      
     }
+
+    // Registra estatisticas em caso de erro
+    if (temp == DEVICE_DISCONNECTED_C){
+      stats[i].leituras_erro++;
+      stats[i].ultimo_erro = true;
+      continue;   //próximo leitor do loop
+    }
+
+    // Registra estatísticas da leitura bem sucedida
+    stats[i].leituras_ok++;
+    stats[i].ultimo_erro = false;
+    stats[i].ultima_temp = temp;
+    ultimaTemperatura[i] = temp;
   }
 
-  // leitura válida
-  stats[index].leiturasOK++;
-  return temp;
+}
+
+// Função de Leitura, sem acessar hardware
+float getUltimaTemperatura(uint8_t index){
+  return ultimaTemperatura[index];
 }
 
 // Função que retorna as estatísticas de um sensor

@@ -182,8 +182,6 @@ void setup() {
 }
 
 void loop() {
-  // ====================== PORTAL WEB ======================
-  webPortalLoop();
 
   // ===================== ATUALIZAÇÃO FIRMWARE =====================
   // Verifica mensagens do Telegram
@@ -212,44 +210,43 @@ void loop() {
     // confere o tempo de 15minutos
 
     // Solicita leitura de todos os sensores
-    sensores.requestTemperatures();
-
-    // Lê as temperaturas pelo índice
-    float temp0 = sensores.getTempCByIndex(0);
-    float temp1 = sensores.getTempCByIndex(1);
+    atualizarSensores();
 
     // Monta a mensagem
     String mensagem = "Leitura de temperatura:\n";
 
-    // Sensor 1
-    if (temp0 == DEVICE_DISCONNECTED_C) {
-      mensagem += "Resf. Bebidas: ERRO\n";
-    } else {
-      mensagem += "Resf. Bebidas: ";
-      mensagem += String(temp0, 2);
-      mensagem += " °C\n";
+    uint8_t quantidadeSensores = getQuantidadeSensores();
+
+    for (uint8_t i = 0; i < quantidadeSensores;i++) {
+
+      float temp = getUltimaTemperatura(i);
+
+        if (temp == DEVICE_DISCONNECTED_C) {
+        mensagem += "Sensor ";
+        mensagem += i;
+        mensagem += ": ERRO\n";
+        } else {
+        mensagem += "Sensor ";
+        mensagem += i;
+        mensagem += ": ";
+        mensagem += String(temp, 1);
+        mensagem += " °C\n";
+        }
+      }
+
+      // Envia para o Telegram
+      enviarMensagemTelegram(mensagem);
+
+      // Atualiza o tempo do último envio
+      ultimoEnvio = millis();
     }
 
-    // Sensor 2
-    if (temp1 == DEVICE_DISCONNECTED_C) {
-      mensagem += "Cong. Padaria: ERRO\n";
-    } else {
-      mensagem += "Cong. Padaria: ";
-      mensagem += String(temp1, 2);
-      mensagem += " °C\n";
-    }
-
-    // Mostra no Monitor Serial
-    LOG(mensagem);
-
-    // Envia para o Telegram
-    enviarMensagemTelegram(mensagem);
-  
-    // Atualiza o tempo do último envio
-    ultimoEnvio = millis();
-  }
+  // ====================== PORTAL WEB ======================
+  // atualiza webportal
+  webPortalLoop();
 
   // pequeno delay para aliviar o cpu
   delay(50);
 
-}
+  // termina loop
+  }
