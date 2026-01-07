@@ -1,6 +1,17 @@
 #pragma once
 #include <Arduino.h>
 
+// ================= ESTATÍSTICAS DOS SENSORES =================
+//Estrutura para monitorar a sáude dos sensores
+struct SensorStats{
+    uint32_t leiturasOK;      //Número de leituras bem sucedidas
+    uint32_t erros;           //Número de leituras com falha
+    unsigned long ultimoErroMs; //millis() da última falha
+};
+//Retorna as estatísticas de um sensor
+SensorStats getSensorStats(uint8_t index);
+
+
 // Inicializa o barramento 1-Wire e detecta sensores
 void iniciarSensores();
 

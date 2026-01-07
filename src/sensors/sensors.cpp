@@ -6,6 +6,8 @@
 // ================= CONFIGURAÇÃO =================
 #define PINO_DATA 4
 
+static SensorStats stats[20]; // Suporta até 20 sensores
+
 static OneWire oneWire(PINO_DATA);
 static DallasTemperature sensores(&oneWire);
 
@@ -19,12 +21,23 @@ void iniciarSensores() {
   sensores.begin();
 
   totalSensores = sensores.getDeviceCount();
+
+  // Zera estatísticas dos sensores
+  for (uint8_t i= 0; i < totalSensores; i++) {
+    stats[i].leiturasOK = 0;
+    stats[i].erros = 0; 
+    stats[i].ultimoErroMs = 0;  
+  }
+
 }
 
+// Retorna quantos sensores foram detectados
 uint8_t getQuantidadeSensores() {
   return totalSensores;
 }
 
+
+// Retorna o ID físico (ROM) do sensor pelo índice
 String getSensorID(uint8_t index) {
 
   DeviceAddress addr;
@@ -45,11 +58,41 @@ String getSensorID(uint8_t index) {
   return String(buffer);
 }
 
+
+// Retorna a temperatura de um sensor pelo índice
 float getTemperatura(uint8_t index) {
 
-  sensores.requestTemperatures();
-
+  //Primeira tentativa
   float temp = sensores.getTempCByIndex(index);
 
+  // Se falhou, tenta uma segunda vez
+  if (temp == DEVICE_DISCONNECTED_C) {
+    stats[index].erros++; 
+    stats[index].ultimoErroMs = millis();
+
+    // pequeno atraso para estabilizar o barramento
+    delay(50);
+
+    //solicita nova leitura
+    sensores.requestTemperatures();
+
+    //segunda tentativa
+    temp = sensores.getTempCByIndex(index);
+
+    //Se falhou de novo, retorna erro
+    if (temp == DEVICE_DISCONNECTED_C) {
+      return temp;
+    }
+  }
+
+  // leitura válida
+  stats[index].leiturasOK++;
   return temp;
 }
+
+// Função que retorna as estatísticas de um sensor
+SensorStats getSensorStats(uint8_t index) {
+    return stats[index];
+}
+
+

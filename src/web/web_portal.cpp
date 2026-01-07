@@ -3,6 +3,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include <DallasTemperature.h>
 
 #include "web_portal.h"
 #include "device/device_config.h"
@@ -21,12 +22,12 @@ void handleRoot() {
   html += "<meta charset='utf-8'>";
   html += "<title>ESP32 - Sensores</title>";
 
-  // Estilo simples
+  // ================= ESTILO =================
   html += "<style>";
   html += "body{font-family:Arial;margin:20px;}";
   html += "h1{color:#333;}";
   html += "table{border-collapse:collapse;}";
-  html += "th,td{border:1px solid #ccc;padding:6px 10px;}";
+  html += "th,td{border:1px solid #ccc;padding:6px 10px;text-align:center;}";
   html += "</style>";
 
   html += "</head><body>";
@@ -56,17 +57,45 @@ void handleRoot() {
   } else {
 
     html += "<table>";
-    html += "<tr><th>#</th><th>ID do Sensor</th></tr>";
+
+    // ====== CABEÇALHO DA TABELA ======
+    html += "<tr>";
+    html += "<th>#</th>";
+    html += "<th>ID do Sensor</th>";
+    html += "<th>Temp (°C)</th>";
+    html += "<th>Erros</th>";
+    html += "</tr>";
 
     for (uint8_t i = 0; i < total; i++) {
 
+      // ======  BUSCA DADOS DO SENSOR ======
+      SensorStats s = getSensorStats(i);
+      float temp = getTemperatura(i);
+
       html += "<tr>";
+
+      // Índice
       html += "<td>";
       html += String(i);
       html += "</td>";
 
+      // ID físico
       html += "<td>";
       html += getSensorID(i);
+      html += "</td>";
+
+      // ======  TEMPERATURA ======
+      html += "<td>";
+      if (temp == DEVICE_DISCONNECTED_C) {
+        html += "ERRO";
+      } else {
+        html += String(temp, 1);
+      }
+      html += "</td>";
+
+      // ====== CONTADOR DE ERROS ======
+      html += "<td>";
+      html += String(s.erros);
       html += "</td>";
 
       html += "</tr>";
@@ -79,7 +108,6 @@ void handleRoot() {
 
   server.send(200, "text/html", html);
 }
-
 
 // ==========================
 // Inicialização
