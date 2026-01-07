@@ -63,50 +63,6 @@ OneWire oneWire(PINO_DATA);
 // Cria o objeto que controla os sensores
 DallasTemperature sensores(&oneWire);
 
-void detectarSensores() {
-  // Solicita à biblioteca que procure sensores no barramento
-  sensores.begin();
-
-  // Obtém quantos sensores foram encontrados
-  int quantidade = sensores.getDeviceCount();
-
-  LOG("Sensores detectados no barramento:");
-  LOG(quantidade);
-
-  // Se não encontrou nenhum, sai da função
-  if (quantidade == 0) {
-    LOG("Nenhum sensor DS18B20 encontrado!");
-    return;
-  }
-
-  // Variável para armazenar o endereço (ID) do sensor
-  DeviceAddress endereco;
-
-  // Percorre todos os sensores encontrados
-  for (int i = 0; i < quantidade; i++) {
-
-    // Tenta obter o endereço (ROM) do sensor
-    if (sensores.getAddress(endereco, i)) {
-
-      Serial.print("Sensor ");
-      Serial.print(i);
-      Serial.print(" - ID: ");
-
-      // O ID tem 8 bytes (64 bits)
-      for (uint8_t j = 0; j < 8; j++) {
-        if (endereco[j] < 16) Serial.print("0");
-        Serial.print(endereco[j], HEX);
-        if (j < 7) Serial.print(":");
-      }
-
-      Serial.println();
-
-    } else {
-      LOG("Erro ao ler ID do sensor ");
-      LOG(i);
-    }
-  }
-}
 
 
 // ====================== CONTROLE DE TEMPO ======================
