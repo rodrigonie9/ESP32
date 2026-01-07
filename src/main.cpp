@@ -55,7 +55,7 @@ bool solicitarOTA = false;
 
 
 // ====================== DS18B20 ======================
-#define PINO_DATA 4   // GPIO onde os sensores estão ligados
+#define PINO_DATA 18   // GPIO onde os sensores estão ligados
 
 // Cria o barramento 1-Wire no pino definido
 OneWire oneWire(PINO_DATA);

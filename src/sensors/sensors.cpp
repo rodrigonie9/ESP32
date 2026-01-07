@@ -4,7 +4,7 @@
 #include <DallasTemperature.h>
 
 // ================= CONFIGURAÇÃO =================
-#define PINO_DATA 4
+#define PINO_DATA 18  // GPIO onde os sensores estão ligados
 
 static SensorStats stats[20]; // Suporta até 20 sensores
 
