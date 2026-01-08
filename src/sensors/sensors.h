@@ -1,6 +1,9 @@
 #pragma once
 #include <Arduino.h>
 
+#define SENSOR_ERRO DEVICE_DISCONNECTED_C
+
+
 // ================= ESTATÍSTICAS DOS SENSORES =================
 //Estrutura para monitorar a sáude dos sensores
 struct SensorStats{

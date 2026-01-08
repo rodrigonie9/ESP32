@@ -1,9 +1,5 @@
 #include <Arduino.h>            // Biblioteca base do Arduino
 
-// Bibliotecas dos sensores
-#include <OneWire.h>            // Protocolo 1-Wire
-#include <DallasTemperature.h>  // Leitura do DS18B20
-
 #include <WiFi.h>               // só no main.cpp para debug
 
 // Módulos do Projeto
@@ -13,8 +9,9 @@
 #include "ota/ota_http.h"
 #include "web/web_portal.h"
 #include "device/device_config.h"  // Configuração nome da placa
-#include <ESPmDNS.h>
 #include "sensors/sensors.h"
+
+#include <ESPmDNS.h>              // identidade do dispositivo placa
 
 // ============================================================================
 // ======================== ATUALIZAÇÃO OTA (HTTP) ============================
@@ -54,17 +51,6 @@ const char* URL_FIRMWARE =
 bool solicitarOTA = false;
 
 
-// ====================== DS18B20 ======================
-#define PINO_DATA 18   // GPIO onde os sensores estão ligados
-
-// Cria o barramento 1-Wire no pino definido
-OneWire oneWire(PINO_DATA);
-
-// Cria o objeto que controla os sensores
-DallasTemperature sensores(&oneWire);
-
-
-
 // ====================== CONTROLE DE TEMPO ======================
 unsigned long ultimoEnvio = 0;              // Guarda o tempo do último envio
 const unsigned long INTERVALO = 120000;      //  
@@ -72,69 +58,64 @@ const unsigned long INTERVALO = 120000;      //
 
 
 void setup() {
-  // Inicia comunicação serial
+  // ====================== SERIAL ======================
   Serial.begin(115200);
   delay(1000);
-
   LOG("Iniciando sistema...");
 
   // ====================== INICIA CONFIG PLACA ======================
   iniciarDeviceConfig();
-
+  LOG("Nome da placa: ");
+  LOG(getNomePlaca());
+  
   // ====================== CONEXÃO WI-FI ======================
   LOG("Conectando ao Wi-Fi");
   conectarWiFi();
   LOG("WiFi Conectado");
 
+
   // ====================== DEFINE HOSTNAME USADO PELA PLACA ======================
   WiFi.setHostname(getNomePlaca().c_str());
   
+
   // ====================== INICIA MDNS ======================
   // Inicia mDNS (permite acessar a placa pelo nome, sem precisar saber o IP)
   if (MDNS.begin(getNomePlaca().c_str())) {
     LOG("mDNS ativo em:");
     LOG("http://" + getNomePlaca() + ".local");
+  } else {
+    LOG("Falha ao iniciar mDNS");
   }
+  
+  // ====================== SENSORES ======================
+  iniciarSensores();
+  LOG("Sensore detectados: ");
+  LOG(getQuantidadeSensores());
+
 
   // ====================== INICIAR WEB PORTAL ======================
   iniciarWebPortal();
+  LOG("Servido Web iniciado");
+
 
   // ====================== INICIA TELEGRAM =====================
   // pega na NVS úlitmo ID de mensagem do telegram, com a mensagem /update
   iniciarTelegramNVS();
 
-  // ====================== INICIA SENSORES ======================
-  iniciarSensores();
-
-  LOG("Sensores detectados:");
-  LOG(getQuantidadeSensores());
-
-  sensores.begin();
-
-  detectarSensores();
-
-  // Conta quantos sensores existem no barramento
-  int qtd = sensores.getDeviceCount();
-  LOG("Sensores encontrados: ");
-  LOG(qtd);
-  
-
-  LOG("WiFi status:");
-  LOG(WiFi.status());
-
+  // ====================== INFO FINAL ======================
   LOG("IP local:");
   LOG(WiFi.localIP().toString());
 
   // Envia mensagem inicial
-  char mensagem_inicial[64];
+  char mensagem[80];
   snprintf(
-    mensagem_inicial,
-    sizeof(mensagem_inicial),
-    "%d de %d sensores de temperaturas ativos RODRIGO",
-    qtd,    // número de sensores ativos
-    2       // total de sensores instalados
+    mensagem,
+    sizeof(mensagem),
+    "Placa %s online\nSensores detectados: %d",
+    getNomePlaca().c_str(),
+    getQuantidadeSensores()
   );
-  enviarMensagemTelegram(mensagem_inicial);
+  enviarMensagemTelegram(mensagem);
 }
 
 void loop() {
@@ -177,7 +158,7 @@ void loop() {
 
       float temp = getUltimaTemperatura(i);
 
-        if (temp == DEVICE_DISCONNECTED_C) {
+        if (temp == SENSOR_ERRO) {
         mensagem += "Sensor ";
         mensagem += i;
         mensagem += ": ERRO\n";
@@ -199,7 +180,10 @@ void loop() {
 
   // ====================== PORTAL WEB ======================
   // atualiza webportal
-  webPortalLoop();
+  if (!solicitarOTA){
+    webPortalLoop();      // só executa se não estiver atualizando (OTA)
+  }
+    
 
   // pequeno delay para aliviar o cpu
   delay(50);
