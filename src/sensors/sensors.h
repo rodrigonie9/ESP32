@@ -1,7 +1,12 @@
 #pragma once
-#include <Arduino.h>
 
+#include <Arduino.h>
+#include <DallasTemperature.h>
+
+
+// Valor padrão para indicar erro de leitura
 #define SENSOR_ERRO DEVICE_DISCONNECTED_C
+
 
 
 // ================= ESTATÍSTICAS DOS SENSORES =================

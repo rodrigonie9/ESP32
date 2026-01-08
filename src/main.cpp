@@ -154,22 +154,23 @@ void loop() {
 
     uint8_t quantidadeSensores = getQuantidadeSensores();
 
-    for (uint8_t i = 0; i < quantidadeSensores;i++) {
+    for (uint8_t i = 0; i < quantidadeSensores; i++) {
 
       float temp = getUltimaTemperatura(i);
 
-        if (temp == SENSOR_ERRO) {
+      if (temp == SENSOR_ERRO) {
         mensagem += "Sensor ";
         mensagem += i;
         mensagem += ": ERRO\n";
-        } else {
+      } else {
         mensagem += "Sensor ";
         mensagem += i;
         mensagem += ": ";
         mensagem += String(temp, 1);
         mensagem += " °C\n";
-        }
-      }
+      } 
+    }
+
 
       // Envia para o Telegram
       enviarMensagemTelegram(mensagem);

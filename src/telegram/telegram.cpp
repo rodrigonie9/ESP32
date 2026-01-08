@@ -77,8 +77,6 @@ void iniciarTelegramNVS() {
 }
 
 
-
-
 // Função que verifica se chegou comando /update no Telegram
 void verificarMensagensTelegram() {
  
