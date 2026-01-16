@@ -1,4 +1,5 @@
 #include "sensors.h"
+#include "config/system_limits.h"
 
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -6,8 +7,8 @@
 // ================= CONFIGURAÇÃO =================
 #define PINO_DATA 18  // GPIO onde os sensores estão ligados
 
-static SensorStats stats[20];         // Suporta até 20 sensores
-static float ultimaTemperatura[20];    // 
+static SensorStats stats[MAX_SENSORES];         // Suporta até 20 sensores
+static float ultimaTemperatura[MAX_SENSORES];    // 
 
 
 static OneWire oneWire(PINO_DATA);
