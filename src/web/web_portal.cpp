@@ -1,138 +1,127 @@
-
-
-#include <WebServer.h>
-#include <WiFi.h>
-#include <ESPmDNS.h>
-#include <DallasTemperature.h>
+# include <WebServer.h>
+# include <WiFi.h>
 
 #include "web_portal.h"
-#include "device/device_config.h"
-#include "debug.h"
+#include "device/device_config.h"  // infrmações da placa esp32
 #include "sensors/sensors.h"
+#include "sensors/sensor_registry.h"
+#include "debug.h"
 
-// Servidor HTTP na porta 80
 WebServer server(80);
 
-// ==========================
-// Página principal
-// ==========================
+//Guardamos o CSS (eswtilo do webportal) na memória flash (PROGMEN) para economizar RAM
+const char WEB_STYLE[] PROGMEM = R"rawliteral(
+<style>
+    body{font-family:sans-serif;margin:20px;background:#f4f4f9;color:#333;}
+    .card{background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin-bottom:20px;}
+    h1,h2{color:#444;}
+    table{width:100%;border-collapse:collapse;margin-top:10px;}
+    th,td{border:1px solid #ddd;padding:12px;text-align:left;}
+    th{background:#f8f8f8;}
+    .btn{padding:8px 15px;border:none;border-radius:4px;cursor:pointer;text-decoration:none;display:inline-block;margin:5px 0;}
+    .btn-primary{background:#007bff;color:#fff;}
+    .btn-danger{background:#dc3545;color:#fff;}
+    input[type=text],input[type=number]{padding:8px;border:1px solid #ccc;border-radius:4px;}
+</style>
+)rawliteral";
+
+
+// ======================== CONSTRUÇÃO DA PÁGINA ===============================================
+// desenha o site no navegador do usuário
+// usa sendContent, enviar site por pedaçoes
+// protegendo memória RAM
 void handleRoot() {
+    // Avisa o navegador que vamos enviar o site em partes (chunks)
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/html", "<!DOCTYPE html><html><head><meta charset='utf-8'>");
+    server.sendContent(WEB_STYLE);
+    server.sendContent("</head><body><h1>Monitor de Temperatura</h1>");
 
-  String html = "<!DOCTYPE html><html><head>";
-  html += "<meta charset='utf-8'>";
-  html += "<title>ESP32 - Sensores</title>";
+    // --- SEÇÃO 1: NOME DA PLACA ---
+    String cardPlaca = "<div class='card'><h2>Configuração da Placa</h2>";
+    cardPlaca += "<form action='/config/placa' method='POST'>";
+    cardPlaca += "Nome: <input type='text' name='nome' value='" + getNomePlaca() + "'> ";
+    cardPlaca += "<input type='submit' value='Salvar' class='btn btn-primary'></form></div>";
+    server.sendContent(cardPlaca);
 
-  // ================= ESTILO =================
-  html += "<style>";
-  html += "body{font-family:Arial;margin:20px;}";
-  html += "h1{color:#333;}";
-  html += "table{border-collapse:collapse;}";
-  html += "th,td{border:1px solid #ccc;padding:6px 10px;text-align:center;}";
-  html += "</style>";
+    // --- SEÇÃO 2: SENSORES CADASTRADOS ---
+    server.sendContent("<div class='card'><h2>Sensores Cadastrados</h2><table>");
+    server.sendContent("<tr><th>Nome</th><th>ID Físico</th><th>Limite</th><th>Temp</th><th>Ações</th></tr>");
 
-  html += "</head><body>";
-
-  // ================= CABEÇALHO =================
-  html += "<h1>Monitor de Temperatura</h1>";
-
-  html += "<p><b>Dispositivo:</b> ";
-  html += getNomePlaca();
-  html += "</p>";
-
-  html += "<p><b>IP:</b> ";
-  html += WiFi.localIP().toString();
-  html += "</p>";
-
-  html += "<hr>";
-
-  // ================= SENSORES =================
-  html += "<h2>Sensores detectados</h2>";
-
-  uint8_t total = getQuantidadeSensores();
-
-  if (total == 0) {
-
-    html += "<p>Nenhum sensor detectado.</p>";
-
-  } else {
-
-    html += "<table>";
-
-        // ====== CABEÇALHO DA TABELA ======
-    html += "<tr>";
-    html += "<th>#</th>";
-    html += "<th>ID do Sensor</th>";
-    html += "<th>Temperatura (°C)</th>";
-    html += "<th>Leituras OK</th>";
-    html += "<th>Leituras ERRO</th>";
-    html += "</tr>";
-
-    for (uint8_t i = 0; i < total; i++) {
-
-      // Busca dados já medidos pelo loop principal
-      float temp = getUltimaTemperatura(i);
-      SensorStats s = getSensorStats(i);
-
-      html += "<tr>";
-
-      // Índice do sensor
-      html += "<td>";
-      html += String(i);
-      html += "</td>";
-
-      // ID físico
-      html += "<td>";
-      html += getSensorID(i);
-      html += "</td>";
-
-      // Temperatura
-      html += "<td>";
-      if (s.ultimo_erro) {
-        html += "<span style='color:red;'>ERRO</span>";
-      } else {
-        html += String(temp, 1);
-      }
-      html += "</td>";
-
-      // Leituras OK
-      html += "<td>";
-      html += String(s.leituras_ok);
-      html += "</td>";
-
-      // Leituras com erro
-      html += "<td>";
-      html += String(s.leituras_erro);
-      html += "</td>";
-
-      html += "</tr>";
+    auto cadastrados = getSensoresCadastrados();
+    for (const auto& s : cadastrados) {
+        float temp = getTemperaturaSensorPorID(s.id_fisico);
+        String row = "<tr><td>" + s.nome_amigavel + "</td>";
+        row += "<td><code>" + s.id_fisico + "</code></td>";
+        row += "<td>" + String(s.temp_max_alerta, 1) + "°C</td>";
+        row += "<td>" + (temp == SENSOR_ERRO ? "<span style='color:red'>OFF</span>" : String(temp, 1) + "°C") + "</td>";
+        row += "<td><a href='/remover?id=" + s.id_fisico + "' class='btn btn-danger'>Remover</a></td></tr>";
+        server.sendContent(row);
     }
+    server.sendContent("</table></div>");
 
-    html += "</table>";
+    // --- SEÇÃO 3: SENSORES NOVOS (DETECTADOS NO FIO) ---
+    server.sendContent("<div class='card'><h2>Detectados no Barramento</h2><table>");
+    server.sendContent("<tr><th>ID Físico</th><th>Ação</th></tr>");
+
+    uint8_t total = getQuantidadeSensoresDetectados();
+    for (uint8_t i = 0; i < total; i++) {
+        String id = getSensorIDPorIndice(i);
+        SensorConfig dummy;
+        if (!buscarSensorPorID(id, dummy)) { // Só mostra se NÃO estiver cadastrado ainda
+            String row = "<tr><td><code>" + id + "</code></td>";
+            row += "<td><form action='/config/sensor' method='POST' style='display:inline;'>";
+            row += "<input type='hidden' name='id' value='" + id + "'>";
+            row += "<input type='text' name='nome' placeholder='Nome' required> ";
+            row += "<input type='number' step='0.1' name='max' value='30.0' style='width:60px;'> ";
+            row += "<input type='submit' value='Cadastrar' class='btn btn-primary'></form></td></tr>";
+            server.sendContent(row);
+        }
+    }
+    server.sendContent("</table></div></body></html>");
+    server.sendContent(""); // Finaliza o envio
+}
+
+
+
+// ======================== AÇÕES E INICIALIZAÇÃO ===============================================
+//Funções que recebem o que o usário digitou e salvam na memória
+void handleConfigPlaca() {
+  if (server.hasArg("nome")) {
+    setNomePlaca(server.arg("nome"));
   }
-
-  html += "</body></html>";
-
-  server.send(200, "text/html", html);
+  server.sendHeader("Location", "/");
+  server.send(303);
 }
 
-// ==========================
-// Inicialização
-// ==========================
+void handleConfigSensor(){
+  if (server.hasArg("id") && server.hasArg("nome")) {
+    SensorConfig s;
+    s.id_fisico = server.arg("id");
+    s.nome_amigavel = server.arg("nome");
+    s.temp_max_alerta = server.arg("max").toFloat();
+    s.monitoramento_ativo = true;
+    salvarSensor(s);
+  }
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+void handleRemoverSensor() {
+    if (server.hasArg("id")) removerSensor(server.arg("id"));
+    server.sendHeader("Location", "/");
+    server.send(303);
+}
+
 void iniciarWebPortal() {
-
-  // Rota principal
-  server.on("/", handleRoot);
-
-  // Inicia servidor
-  server.begin();
-
-  LOG("Servidor Web iniciado.");
+    server.on("/", handleRoot);
+    server.on("/config/placa", HTTP_POST, handleConfigPlaca);
+    server.on("/config/sensor", HTTP_POST, handleConfigSensor);
+    server.on("/remover", handleRemoverSensor);
+    server.begin();
+    LOG("Servidor Web iniciado.");
 }
 
-// ==========================
-// Loop
-// ==========================
 void webPortalLoop() {
-  server.handleClient();
+    server.handleClient();
 }
-

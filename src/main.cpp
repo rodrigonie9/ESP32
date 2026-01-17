@@ -90,7 +90,7 @@ void setup() {
   // ====================== SENSORES ======================
   iniciarSensores();
   LOG("Sensore detectados: ");
-  LOG(getQuantidadeSensores());
+  LOG(getQuantidadeSensoresDetectados());
 
 
   // ====================== INICIAR WEB PORTAL ======================
@@ -113,7 +113,7 @@ void setup() {
     sizeof(mensagem),
     "Placa %s online\nSensores detectados: %d",
     getNomePlaca().c_str(),
-    getQuantidadeSensores()
+    getQuantidadeSensoresDetectados()
   );
   enviarMensagemTelegram(mensagem);
 }
@@ -152,11 +152,11 @@ void loop() {
     // Monta a mensagem
     String mensagem = "Leitura de temperatura:\n";
 
-    uint8_t quantidadeSensores = getQuantidadeSensores();
+    uint8_t quantidadeSensores = getQuantidadeSensoresDetectados();
 
     for (uint8_t i = 0; i < quantidadeSensores; i++) {
 
-      float temp = getUltimaTemperatura(i);
+      float temp = getTemperaturaSensorPorID(getSensorIDPorIndice(i));
 
       if (temp == SENSOR_ERRO) {
         mensagem += "Sensor ";
