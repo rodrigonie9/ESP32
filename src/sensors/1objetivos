@@ -1,0 +1,131 @@
+OBJETIVOS DO PROJETO (VERSÃO ATUAL)
+1️⃣ Cadastro de sensores na NVS
+
+Associar cada ID físico (ROM do DS18B20) a um nome lógico
+
+Ex: Freezer Bebidas, Câmara Frios, Congelador Padaria
+
+Gerenciar pelo Web Portal:
+
+Adicionar
+
+Editar
+
+Remover
+
+Persistência na NVS (sobrevive a reboot e OTA)
+
+2️⃣ Detecção de sensores ausentes
+
+Comparar:
+
+Sensores cadastrados na NVS
+
+Sensores fisicamente detectados no barramento
+
+Se um sensor cadastrado não aparecer fisicamente:
+
+Marcar como ausente
+
+Exibir alerta no Web Portal
+
+Ajuda direta na manutenção (sensor queimado, fio rompido, etc.)
+
+3️⃣ Nome do dispositivo (ESP32)
+
+Cada placa terá um nome único
+
+Nome:
+
+Salvo na NVS
+
+Editável pelo Web Portal
+
+Usado em logs, mensagens e identificação
+
+4️⃣ Acesso ao Web Portal por nome (mDNS)
+
+Acessar por:
+
+http://nome-da-placa.local
+
+
+Evita depender de IP
+
+Facilita quando houver várias placas
+
+5️⃣ Configuração de hardware via Web Portal
+
+Tornar configurável via Web:
+
+GPIO do barramento 1-Wire
+
+Futuro suporte a múltiplos pinos (ex: GPIO 18 e 21)
+
+Configuração salva na NVS
+
+Evita recompilar firmware
+
+6️⃣ Segurança básica do Web Portal
+
+Proteção com senha
+
+Evitar acesso indevido na rede local
+
+🧠 NOVO OBJETIVO PRINCIPAL (ADICIONADO)
+7️⃣ Monitoramento inteligente de temperatura e alertas
+📊 Fase 1 — Coleta e análise
+
+Registrar leituras de temperatura:
+
+A cada 15 minutos (como já está)
+
+Para cada sensor/câmara
+
+Guardar histórico suficiente para:
+
+Entender comportamento normal
+
+Identificar:
+
+Degelo
+
+Picos temporários
+
+Temperatura realmente fora do padrão
+
+Cada câmara pode ter:
+
+Faixa de temperatura diferente
+
+Ex: freezer ≠ câmara fria ≠ bebidas
+
+🚨 Fase 2 — Alerta inteligente
+
+Para cada sensor, definir:
+
+Temperatura mínima aceitável
+
+Temperatura máxima aceitável
+
+Lógica de alerta:
+
+Leitura fora do padrão → não alerta ainda
+
+Aguarda 5 minutos
+
+Faz nova leitura
+
+Se continuar fora do padrão:
+
+Envia alerta via Telegram
+
+Identifica:
+
+Nome da câmara
+
+Temperatura atual
+
+Tempo fora do padrão
+
+Evita falsos alarmes (ex: degelo automático)

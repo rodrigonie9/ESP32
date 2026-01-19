@@ -16,6 +16,11 @@
 
 // ================= CONFIGURAÇÃO =================
 
+enum ModoMonitoramento {
+    SEMPRE_24H = 0,
+    AGENDA_SEMANAL = 1,
+    AGENDA_DIARIA = 2
+};
 
 // Estrutura do cadastro do sensor
 struct SensorConfig {
@@ -25,7 +30,28 @@ struct SensorConfig {
     uint16_t tempo_espera_min;  // Tempo para ignorar temperatua alta
     float temp_critica;         // Limite grave, se atingir avisa imediatamente
     bool monitoramento_ativo;   // Monitoramento Ligado/Desligado
+
     unsigned long mudo_ate;     // Timestamp para modo manutenção (0 = nornmal)
+    uint8_t horas_mudo_padrao;  // Usuário define se botão silencia por 1h, 2, 24h
+
+    bool usar_agenda;           // True = segue agenda - falso = 24h por dia
+    
+    // Modo de Monitoramento
+    ModoMonitoramento modo;
+
+    // Para Agenda Semanal (Ex: Sábado 19:00 até Segunda 08:30)
+    uint8_t dia_desliga_semanal;   // 0-6
+    uint8_t hora_desliga_semanal;
+    uint8_t min_desliga_semanal;
+    uint8_t dia_religa_semanal;    // 0-6
+    uint8_t hora_religa_semanal;
+    uint8_t min_religa_semanal;
+
+    // Para Agenda Diária (Ex: Todos os dias das 19:00 às 08:00)
+    uint8_t hora_desliga_diaria;
+    uint8_t min_desliga_diaria;
+    uint8_t hora_religa_diaria;
+    uint8_t min_religa_diaria;
 };
 
 // ================= FUNÇÕES =================

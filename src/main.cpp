@@ -2,6 +2,8 @@
 
 #include <WiFi.h>               // só no main.cpp para debug
 
+#include <time.h>
+
 // Módulos do Projeto
 #include "debug.h"
 #include "wifi_config/wifi_config.h"
@@ -58,20 +60,25 @@ const unsigned long INTERVALO = 120000;      //
 
 
 void setup() {
-  // ====================== SERIAL ======================
+  // ====================== SERIAL ==============================================
   Serial.begin(115200);
   delay(1000);
   LOG("Iniciando sistema...");
 
-  // ====================== INICIA CONFIG PLACA ======================
+  // ====================== INICIA CONFIG PLACA ==================================
   iniciarDeviceConfig();
   LOG("Nome da placa: ");
   LOG(getNomePlaca());
   
-  // ====================== CONEXÃO WI-FI ======================
+  // ====================== CONEXÃO WI-FI ========================================
   LOG("Conectando ao Wi-Fi");
   conectarWiFi();
   LOG("WiFi Conectado");
+
+  // ====================== CONEXÃO WI-FI ========================================
+  // O valor -10800 é: -3 horas * 3600 segundos
+  configTime(-10800, 0, "pool.ntp.org", "time.nist.gov");
+  LOG("Sincronizando hora via NTP...");
 
 
   // ====================== DEFINE HOSTNAME USADO PELA PLACA ======================
@@ -91,8 +98,7 @@ void setup() {
   iniciarSensores();
   LOG("Sensore detectados: ");
   LOG(getQuantidadeSensoresDetectados());
-
-
+ 
   // ====================== INICIAR WEB PORTAL ======================
   iniciarWebPortal();
   LOG("Servido Web iniciado");
@@ -146,30 +152,33 @@ void loop() {
     // confere se não está atualizando firmware (solicitarOTA = true)
     // confere o tempo de 15minutos
 
+    ultimoEnvio = millis(); 
+
     // Solicita leitura de todos os sensores
     atualizarSensores();
 
     // Monta a mensagem
-    String mensagem = "Leitura de temperatura:\n";
+    String mensagem = "📊 *Relatório de Rotina*\n";
+    mensagem += "Placa: " + getNomePlaca() + "\n\n";
 
-    uint8_t quantidadeSensores = getQuantidadeSensoresDetectados();
+    // Total Sensores ESP32, que está enxergando no fio, conectado
+    uint8_t totalSensoresNoFio = getQuantidadeSensoresDetectados();
 
-    for (uint8_t i = 0; i < quantidadeSensores; i++) {
+    for (uint8_t i = 0; i < totalSensoresNoFio; i++) {
 
-      float temp = getTemperaturaSensorPorID(getSensorIDPorIndice(i));
+      // 1 Pega o ID do sensor pela posição (evita trabalhar por indice
+      //   se perder um sensor no meio do loop, erra leitura por camera
+      String id_fisico = getSensorIDPorIndice(i);
 
-      if (temp == SENSOR_ERRO) {
-        mensagem += "Sensor ";
-        mensagem += i;
-        mensagem += ": ERRO\n";
-      } else {
-        mensagem += "Sensor ";
-        mensagem += i;
-        mensagem += ": ";
-        mensagem += String(temp, 1);
-        mensagem += " °C\n";
-      } 
-    }
+      // 2 Busca temperatura usando ID do sensore
+      float temp = getTemperaturaSensorPorID(id_fisico);
+
+      // 3 Pega nome amigável do sensor
+      String nome_amigavel = getse
+
+
+
+
 
 
       // Envia para o Telegram

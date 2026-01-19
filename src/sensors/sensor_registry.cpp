@@ -21,12 +21,32 @@ static void gravarSensoresNvs(){
     //para cada sensor na nossa lista[], criamos um objeto{} no JSON
     for (const auto& s : sensoresCadastrados) {
         JsonObject obj = array.add<JsonObject>();
-        obj["id"] = s.id_fisico;
-        obj["nome"] = s.nome_amigavel;
-        obj["max"] = s.temp_max_alerta;
-        obj["espera"] = s.tempo_espera_min;
-        obj["critica"] = s.temp_critica;
-        obj["ativo"] = s.monitoramento_ativo;
+        obj["id_fisico"] = s.id_fisico;
+        obj["nome_amigavel"] = s.nome_amigavel;
+        obj["temp_max_alerta"] = s.temp_max_alerta;
+        obj["tempo_espera_min"] = s.tempo_espera_min;
+        obj["temp_critica"] = s.temp_critica;
+        obj["monitoramento_ativo"] = s.monitoramento_ativo;
+        obj["horas_mudo_padrao"] = s.horas_mudo_padrao;
+        obj["modo"] = (int)s.modo;
+
+        // Uso Agenda
+        obj["usar_agenda"] = s.usar_agenda;
+
+        // Dados da Agenda Semanal
+        obj["dia_desliga_semanal"] = s.dia_desliga_semanal;
+        obj["hora_desliga_semanal"] = s.hora_desliga_semanal;
+        obj["min_desliga_semanal"] = s.min_desliga_semanal;
+        obj["dia_religa_semanal"] = s.dia_religa_semanal;
+        obj["hora_religa_semanal"] = s.hora_religa_semanal;
+        obj["min_religa_semanal"] = s.min_religa_semanal;
+
+        // Dados da Agenda Diária
+        obj["hora_desliga_diaria"] = s.hora_desliga_diaria;
+        obj["min_desliga_diaria"] = s.min_desliga_diaria;        
+        obj["hora_religa_diaria"] = s.hora_religa_diaria;
+        obj["min_religa_diaria"] = s.min_religa_diaria;
+
     }
 
     String json;
@@ -54,20 +74,39 @@ void iniciarSensorRegistry(){
 
     if(!error) {
         JsonArray array = doc.as<JsonArray>();
-        for (JsonObject obj : array){
+        for (JsonObject obj : array) {
             SensorConfig s;
-            s.mudo_ate = 0;
-            s.id_fisico = obj["id"].as<String>();
-            s.nome_amigavel = obj["nome"].as<String>();
-            s.temp_max_alerta = obj["max"].as<float>();
-            s.tempo_espera_min = obj["espera"].as<uint16_t>();
-            s.temp_critica = obj["critica"].as<float>();
-            s.monitoramento_ativo = obj["ativo"].as<bool>();
-            sensoresCadastrados.push_back(s);       //adiciona na lista RAM
-        }
-        LOG("Registro de sensores carregados: " + String(sensoresCadastrados.size()) + " sensores.");
-    }
+            s.id_fisico = obj["id_fisico"].as<String>();
+            s.nome_amigavel = obj["nome_amigavel"].as<String>();
+            s.temp_max_alerta = obj["temp_max_alerta"].as<float>();
+            s.tempo_espera_min = obj["tempo_espera_min"].as<uint16_t>();
+            s.temp_critica = obj["temp_critica"].as<float>();
+            s.monitoramento_ativo = obj["monitoramento_ativo"].as<bool>();
+            s.horas_mudo_padrao = obj["horas_mudo_padrao"].as<uint8_t>();
+            s.modo = (ModoMonitoramento)obj["modo"].as<int>();
 
+            // Uso de Agenga
+            s.usar_agenda = obj["usar_agenda"].as<bool>();
+
+            // Agenda Semanal
+            s.dia_desliga_semanal = obj["dia_desliga_semanal"].as<uint8_t>();
+            s.hora_desliga_semanal = obj["hora_desliga_semanal"].as<uint8_t>();
+            s.min_desliga_semanal = obj["min_desliga_semanal"].as<uint8_t>();
+            s.dia_religa_semanal = obj["dia_religa_semanal"].as<uint8_t>();
+            s.hora_religa_semanal = obj["hora_religa_semanal"].as<uint8_t>();
+            s.min_religa_semanal = obj["min_religa_semanal"].as<uint8_t>();
+
+            // Agenda Diária
+            s.hora_desliga_diaria = obj["hora_desliga_diaria"].as<uint8_t>();
+            s.min_desliga_diaria = obj["min_desliga_diaria"].as<uint8_t>();
+            s.hora_religa_diaria = obj["hora_religa_diaria"].as<uint8_t>();
+            s.min_religa_diaria = obj["min_religa_diaria"].as<uint8_t>();
+
+            s.mudo_ate = 0; // Reset do modo mudo ao reiniciar
+            sensoresCadastrados.push_back(s);
+        }
+        LOG("Registro carregado: " + String(sensoresCadastrados.size()) + " sensores.");
+    }
 }
 
 //retornar lista completa para quem precisar ex: webportal
