@@ -194,9 +194,10 @@ void loop() {
         mensagem += String (temp, 1) + "°C\n";
       }
 
+    }
+
       // Envia para o Telegram
       enviarMensagemTelegram(mensagem);
-    }
 
   }
 
