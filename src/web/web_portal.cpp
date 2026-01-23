@@ -48,9 +48,9 @@ void handleRoot() {
     server.sendContent("<div class='card'><h2>Sensores Cadastrados</h2><table>");
     server.sendContent("<tr><th>Nome</th><th>ID Físico</th><th>Limite</th><th>Temp</th><th>Ações</th></tr>");
 
-    auto cadastrados = getSensoresCadastrados();
+    auto cadastrados = registry_getTodos();
     for (const auto& s : cadastrados) {
-        float temp = getTemperaturaSensorPorID(s.id_fisico);
+        float temp = hw_getTemp(s.id_fisico);
         String row = "<tr><td>" + s.nome_amigavel + "</td>";
         row += "<td><code>" + s.id_fisico + "</code></td>";
         row += "<td>" + String(s.temp_max_alerta, 1) + "°C</td>";
@@ -64,11 +64,11 @@ void handleRoot() {
     server.sendContent("<div class='card'><h2>Detectados no Barramento</h2><table>");
     server.sendContent("<tr><th>ID Físico</th><th>Ação</th></tr>");
 
-    uint8_t total = getQuantidadeSensoresDetectados();
+    uint8_t total = hw_getContagem();
     for (uint8_t i = 0; i < total; i++) {
-        String id = getSensorIDPorIndice(i);
+        String id = hw_getID(i);
         SensorConfig dummy;
-        if (!buscarSensorPorID(id, dummy)) { // Só mostra se NÃO estiver cadastrado ainda
+        if (!registry_buscarPorID(id, dummy)) { // Só mostra se NÃO estiver cadastrado ainda
             String row = "<tr><td><code>" + id + "</code></td>";
             row += "<td><form action='/config/sensor' method='POST' style='display:inline;'>";
             row += "<input type='hidden' name='id' value='" + id + "'>";
@@ -101,14 +101,14 @@ void handleConfigSensor(){
     s.nome_amigavel = server.arg("nome");
     s.temp_max_alerta = server.arg("max").toFloat();
     s.monitoramento_ativo = true;
-    salvarSensor(s);
+    registry_salvar(s);
   }
   server.sendHeader("Location", "/");
   server.send(303);
 }
 
 void handleRemoverSensor() {
-    if (server.hasArg("id")) removerSensor(server.arg("id"));
+    if (server.hasArg("id")) registry_remover(server.arg("id"));
     server.sendHeader("Location", "/");
     server.send(303);
 }

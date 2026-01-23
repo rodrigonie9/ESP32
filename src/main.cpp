@@ -58,6 +58,9 @@ bool solicitarOTA = false;
 unsigned long ultimoEnvio = 0;              // Guarda o tempo do último envio
 const unsigned long INTERVALO = 120000;      //  
 
+unsigned long ultimoRelatorio = 0;
+unsigned long ultimaLeitura = 0;
+
 
 
 void setup() {
@@ -96,10 +99,16 @@ void setup() {
   }
   
   // ====================== SENSORES ======================
-  iniciarSensores();
+  // Iniciar sensores Hardwatre
+  registry_iniciar(); // memória e configurações
+
+  hw_iniciar();      //hardware
   LOG("Sensore detectados: ");
-  LOG(getQuantidadeSensoresDetectados());
- 
+  LOG(hw_getContagem());
+
+
+
+
   // ====================== INICIAR WEB PORTAL ======================
   iniciarWebPortal();
   LOG("Servido Web iniciado");
@@ -114,13 +123,13 @@ void setup() {
   LOG(WiFi.localIP().toString());
 
   // Envia mensagem inicial
-  char mensagem[80];
+  char mensagem[128];
   snprintf(
     mensagem,
     sizeof(mensagem),
     "Placa %s online\nSensores detectados: %d",
     getNomePlaca().c_str(),
-    getQuantidadeSensoresDetectados()
+    hw_getContagem()
   );
   enviarMensagemTelegram(mensagem);
 }
@@ -156,26 +165,26 @@ void loop() {
     ultimoEnvio = millis(); 
 
     // Solicita leitura de todos os sensores
-    atualizarSensores();
+    hw_lerTodos();
 
     // Monta a mensagem
     String mensagem = "📊 *Relatório de Rotina*\n";
     mensagem += "Placa: " + getNomePlaca() + "\n\n";
 
     // Total Sensores ESP32, que está enxergando no fio, conectado
-    uint8_t totalSensoresNoFio = getQuantidadeSensoresDetectados();
+    uint8_t totalSensoresNoFio = hw_getContagem();
 
     for (uint8_t i = 0; i < totalSensoresNoFio; i++) {
 
       // 1 Pega o ID do sensor pela posição (evita trabalhar por indice
       //   se perder um sensor no meio do loop, erra leitura por camera
-      String id_fisico = getSensorIDPorIndice(i);
+      String id_fisico = hw_getID(i);
 
       // 2 Busca temperatura usando ID do sensore
-      float temp = getTemperaturaSensorPorID(id_fisico);
+      float temp = hw_getTemp(id_fisico);
 
       // 3 Pega nome amigável do sensor
-      String nome_amigavel = getNomeAmigavelSensor (id_fisico);
+      String nome_amigavel = registry_getNome (id_fisico);
 
       // Escreve informação sensor na mensagem
       mensagem += "🔹 " + nome_amigavel + ": ";
@@ -184,8 +193,6 @@ void loop() {
       } else {
         mensagem += String (temp, 1) + "°C\n";
       }
-
-
 
       // Envia para o Telegram
       enviarMensagemTelegram(mensagem);

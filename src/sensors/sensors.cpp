@@ -1,3 +1,5 @@
+//HARDWARE / fio
+
 #include "sensors.h"
 #include "../debug.h"
 
@@ -33,14 +35,14 @@ static SensorStats stats[MAX_SENSORES];
 // dentro da função iniciarSensores, temos a função escanearBarramento
 // escaneamor barramentoA e barramentoB dentro da função
 
-void iniciarSensores(){
+void hw_iniciar(){
   barramentoA.begin();
   barramentoB.begin();
 
   totalDetectados = 0;
 
   //Função auxiliar interna para escanear um barramento (Lambda, função dentro da função)
-  auto escanearBarramento = [](DallasTemperature& bus, uint8_t barramentoID){
+  auto escanear = [](DallasTemperature& bus, uint8_t barramentoID){
     uint8_t count = bus.getDeviceCount();
 
     for(uint8_t i = 0; i < count && totalDetectados < MAX_SENSORES; i++) {   //totalDetectados - MAXSENSORS, para não levar o loop sempre até 30
@@ -57,8 +59,8 @@ void iniciarSensores(){
   };
   
   // Executa o escaneamento nos dois pinos
-  escanearBarramento(barramentoA, 0);
-  escanearBarramento(barramentoB, 1);
+  escanear(barramentoA, 0);
+  escanear(barramentoB, 1);
 
   //Limpa estatísticas usando o limite centralizado
   for (uint8_t i = 0; i < MAX_SENSORES; i++) {
@@ -71,7 +73,7 @@ void iniciarSensores(){
 }
 
 // referência dinâmica BUS, aponta para o barramento correto
-void atualizarSensores(){
+void hw_lerTodos(){
   barramentoA.requestTemperatures();
   barramentoB.requestTemperatures();
 
@@ -107,43 +109,31 @@ void atualizarSensores(){
 
 // --- FUNÇÕES DE CONSULTA (Mantêm a mesma lógica) ---
 
-uint8_t getQuantidadeSensoresDetectados() { return totalDetectados; }
+uint8_t hw_getContagem() { 
+  return totalDetectados; 
+}
 
-String getSensorIDPorIndice (uint8_t index) {
-  if (index < totalDetectados) {
-    return mapa[index].id;
+String hw_getID (uint8_t indice) {
+  if (indice < totalDetectados) {
+    return mapa[indice].id;
   } else {
     return "";
   }
 }
 
-uint8_t getSensorIndicePorId(const String& id_fisico) {
-  for (uint8_t i = 0; i < totalDetectados; i++) {
-    if (mapa[i].id == id_fisico){
-      return i;
-    } else {
-      return 255;
+
+float hw_getTemp(const String& id_fisico) {
+  for (uint8_t i = 0; i < totalDetectados; i++){
+    if (mapa[i].id == id_fisico) return ultimaTemperatura[i];
+  }
+  return DEVICE_DISCONNECTED_C;
+}
+
+SensorStats hw_getStats(const String& id_fisico)  {
+    for (uint8_t i = 0; i < totalDetectados; i++) {
+      if (mapa[i].id == id_fisico) return stats[i];
     }
-    
-  }
-}
-
-float getTemperaturaSensorPorID(const String& id_fisico) {
-  uint8_t idx = getSensorIndicePorId(id_fisico);
-  if (idx != 255) {
-    return ultimaTemperatura[idx];
-  } else {
-    return SENSOR_ERRO;
-  }
-}
-
-SensorStats getSensoresStatsPorId(const String& id_fisico)  {
-  uint8_t idx = getSensorIndicePorId(id_fisico);
-  if (idx != 255){
-    return stats[idx];
-  } else {
-    return {0, 0, SENSOR_ERRO, true};
-  }
+    return {0, 0, DEVICE_DISCONNECTED_C, true};
 }
 
 

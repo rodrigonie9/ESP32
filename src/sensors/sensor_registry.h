@@ -1,8 +1,4 @@
-// USO:
-// * Agenda de coleta de temperatura por sensor
-// * Registro de informações de temperatura
-// * Registros de nomes amigáveis do sensor
-// * Gravar / Apagar sensor web portal
+// BANCO DE DADOS - cadastro  / NVS
 
 
 
@@ -50,30 +46,21 @@ struct SensorConfig {
     ModoMonitoramento modo;
 
     // Para Agenda Semanal (Ex: Sábado 19:00 até Segunda 08:30)
-    uint8_t dia_desliga_semanal;   // 0-6
-    uint8_t hora_desliga_semanal;
-    uint8_t min_desliga_semanal;
-    uint8_t dia_religa_semanal;    // 0-6
-    uint8_t hora_religa_semanal;
-    uint8_t min_religa_semanal;
+    // DIA SEMANA 0 - 6
+    uint8_t dia_desliga_semanal, hora_desliga_semanal, min_desliga_semanal;   
+    uint8_t dia_religa_semanal, hora_religa_semanal, min_religa_semanal;
+
 
     // Para Agenda Diária (Ex: Todos os dias das 19:00 às 08:00)
-    uint8_t hora_desliga_diaria;
-    uint8_t min_desliga_diaria;
-    uint8_t hora_religa_diaria;
-    uint8_t min_religa_diaria;
+    uint8_t hora_desliga_diaria, min_desliga_diaria;
+    uint8_t hora_religa_diaria, min_religa_diaria;
 };
 
 // ================= FUNÇÕES =================
-void iniciarSensorRegistry();
-
-bool salvarSensor(const SensorConfig& config);
-
-bool removerSensor(const String& id_fisico);
-
-String getNomeAmigavelSensor(const String& id_fisico);
-
-bool buscarSensorPorID(const String& id_fisico, SensorConfig& config); //Uso no webPortal
-
-std::vector<SensorConfig> getSensoresCadastrados();
+void registry_iniciar();
+bool registry_salvar(const SensorConfig& config);
+bool registry_remover(const String& id_fisico);
+String registry_getNome(const String& id_fisico);
+bool registry_buscarPorID(const String& id_fisico, SensorConfig& config);
+std::vector<SensorConfig> registry_getTodos();
 

@@ -1,9 +1,4 @@
-// USO:
-// * Iniciar sensores
-// * Atualizar sensores
-// * Busca sensor por ID
-// * Busca sensor por Indice
-// * Busca temperatura
+// HARDWARE / fio
 
 #pragma once
 
@@ -26,16 +21,13 @@ struct SensorStats{
 
 // ================= FUNÇÕES DE HARDWARE (O que mexe no fio) =================
 
-void iniciarSensores();         // Inicializa o barramento 1-Wire e detecta sensores
-void atualizarSensores();       // Faz a leitura física de todos os sensores
+void hw_iniciar();         // Inicializa o barramento 1-Wire e detecta sensores
+void hw_lerTodos();             // Faz a leitura física de todos os sensores
 
 // ================= FUNÇÕES DE INFORMAÇÃO (O que consulta a RAM) =================
-uint8_t getQuantidadeSensoresDetectados();                  // Quantos senores respondem no fio agora
-String getSensorIDPorIndice(uint8_t index);                 // Pega o ID (ROM) pela posição
-uint8_t getSensorIndicePorId(const String& id_fisico);      // Pega posição pelo ID
+uint8_t hw_getContagem();                       // Quantos senores respondem no fio agora
+String hw_getID(uint8_t indice);               // Pega o ID (ROM) pela posição
 
+float hw_getTemp(const String& id_fisico);
 
-
-// ================= FUNÇÕES DE LEITURA (O que o resto do código vai usar) =================
-float getTemperaturaSensorPorID(const String& id_fisico);
-SensorStats getSensoresStatsPorId(const String& id_fisico);
+SensorStats hw_getStats(const String& id_fisico);
