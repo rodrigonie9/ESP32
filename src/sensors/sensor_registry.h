@@ -1,4 +1,13 @@
+// USO:
+// * Agenda de coleta de temperatura por sensor
+// * Registro de informações de temperatura
+// * Registros de nomes amigáveis do sensor
+// * Gravar / Apagar sensor web portal
+
+
+
 #pragma once
+
 
 #include <Arduino.h>
 #include <vector>            
@@ -14,13 +23,14 @@
 //      mas em um plástico, para que a pessoa não possa escrever nela
 
 
-// ================= CONFIGURAÇÃO =================
 
+// ================= CONFIGURAÇÃO =================
 enum ModoMonitoramento {
     SEMPRE_24H = 0,
     AGENDA_SEMANAL = 1,
     AGENDA_DIARIA = 2
 };
+
 
 // Estrutura do cadastro do sensor
 struct SensorConfig {
@@ -61,9 +71,9 @@ bool salvarSensor(const SensorConfig& config);
 
 bool removerSensor(const String& id_fisico);
 
-String getNomeAmigavel(const String& id_fisico);
+String getNomeAmigavelSensor(const String& id_fisico);
 
-bool buscarSensorPorID(const String& id_fisico, SensorConfig& config);
+bool buscarSensorPorID(const String& id_fisico, SensorConfig& config); //Uso no webPortal
 
 std::vector<SensorConfig> getSensoresCadastrados();
 

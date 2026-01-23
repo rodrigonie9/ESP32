@@ -12,6 +12,7 @@
 #include "web/web_portal.h"
 #include "device/device_config.h"  // Configuração nome da placa
 #include "sensors/sensors.h"
+#include "sensors/sensor_registry.h"
 
 #include <ESPmDNS.h>              // identidade do dispositivo placa
 
@@ -174,19 +175,23 @@ void loop() {
       float temp = getTemperaturaSensorPorID(id_fisico);
 
       // 3 Pega nome amigável do sensor
-      String nome_amigavel = getse
+      String nome_amigavel = getNomeAmigavelSensor (id_fisico);
 
-
-
+      // Escreve informação sensor na mensagem
+      mensagem += "🔹 " + nome_amigavel + ": ";
+      if (temp == SENSOR_ERRO) {
+        mensagem += "ERRO\n";
+      } else {
+        mensagem += String (temp, 1) + "°C\n";
+      }
 
 
 
       // Envia para o Telegram
       enviarMensagemTelegram(mensagem);
-
-      // Atualiza o tempo do último envio
-      ultimoEnvio = millis();
     }
+
+  }
 
   // ====================== PORTAL WEB ======================
   // atualiza webportal
