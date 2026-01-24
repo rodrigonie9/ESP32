@@ -5,4 +5,4 @@
 void processarLogicaAlertas();
 
 // Função para colocar um sensor em modo manutenção (mudo) por X horas
-void setModoManutencao(const String& id_fisico, uint8_t horas);
+void alert_setModoManutencao(const String& id_fisico, uint8_t horas);

@@ -80,7 +80,7 @@ void setup() {
   LOG("WiFi Conectado");
 
   // ====================== CONEXÃO WI-FI ========================================
-  // O valor -10800 é: -3 horas * 3600 segundos
+  // O valor -10800 é: -3 horas * 3600 segundos // ajustar fuso
   configTime(-10800, 0, "pool.ntp.org", "time.nist.gov");
   LOG("Sincronizando hora via NTP...");
 

@@ -163,6 +163,8 @@ String registry_getNome(const String& id_fisico) {
 }
 
 // Busca a configuração completa de um sensor específico
+// buscar por um ID, quando encontra esse ID, ele copia os daodos deste sensor para o variável chamada na função config
+//  config = s
 bool registry_buscarPorID (const String& id_fisico, SensorConfig& config) {
     for (const auto& s : sensoresCadastrados){
         if (s.id_fisico == id_fisico) {
