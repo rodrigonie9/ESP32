@@ -4,6 +4,7 @@
 
 #include <time.h>
 
+
 // Módulos do Projeto
 #include "debug.h"
 #include "wifi_config/wifi_config.h"
@@ -61,6 +62,7 @@ const unsigned long INTERVALO = 120000;      //
 unsigned long ultimoRelatorio = 0;
 unsigned long ultimaLeitura = 0;
 
+#define TAMANHO_MSG 512 //tamanho buffer
 
 
 void setup() {
@@ -83,8 +85,20 @@ void setup() {
   // O valor -10800 é: -3 horas * 3600 segundos // ajustar fuso
   configTime(-10800, 0, "pool.ntp.org", "time.nist.gov");
   LOG("Sincronizando hora via NTP...");
-
-
+  
+  //tenta garantir que pegou a hora certa (usa delay, até 5s em 10 tentativas)
+  struct tm timeinfo;
+  int tentativas = 0;
+  while(!getLocalTime(&timeinfo) && tentativas < 10) {
+    delay(500);
+    tentativas++;
+  }
+  if(tentativas < 10) {
+    LOG("NTP sincronizado com sucesso");
+  } else {
+    LOG("NTP falhou - continuando sem hora sincronizada");
+  }
+  
   // ====================== DEFINE HOSTNAME USADO PELA PLACA ======================
   WiFi.setHostname(getNomePlaca().c_str());
   
@@ -168,36 +182,31 @@ void loop() {
     hw_lerTodos();
 
     // Monta a mensagem
-    String mensagem = "📊 *Relatório de Rotina*\n";
-    mensagem += "Placa: " + getNomePlaca() + "\n\n";
+    char mensagem[TAMANHO_MSG]; //array de char tamanho fixo, memória liberada após sair do bloco
+    char linha[64];
 
-    // Total Sensores ESP32, que está enxergando no fio, conectado
+    //buffer fixo com snprinft, escreve direto no buffer, sem string na memória
+    snprintf(mensagem, sizeof(mensagem), "Relatorio de Rotina\nPlaca: %s\n\n", getNomePlaca().c_str());
+
     uint8_t totalSensoresNoFio = hw_getContagem();
 
     for (uint8_t i = 0; i < totalSensoresNoFio; i++) {
 
-      // 1 Pega o ID do sensor pela posição (evita trabalhar por indice
-      //   se perder um sensor no meio do loop, erra leitura por camera
       String id_fisico = hw_getID(i);
-
-      // 2 Busca temperatura usando ID do sensore
       float temp = hw_getTemp(id_fisico);
+      String nome_amigavel = registry_getNome(id_fisico);
 
-      // 3 Pega nome amigável do sensor
-      String nome_amigavel = registry_getNome (id_fisico);
-
-      // Escreve informação sensor na mensagem
-      mensagem += "🔹 " + nome_amigavel + ": ";
       if (temp == SENSOR_ERRO) {
-        mensagem += "ERRO\n";
+          snprintf(linha, sizeof(linha), "- %s: ERRO\n", nome_amigavel.c_str());
       } else {
-        mensagem += String (temp, 1) + "°C\n";
+          snprintf(linha, sizeof(linha), "- %s: %.1f grC\n", nome_amigavel.c_str(), temp);
       }
+      //strncat - concatena com segurança, respeitando limite do buffer
+      strncat(mensagem, linha, sizeof(mensagem) - strlen(mensagem) - 1);
+  }
 
-    }
-
-      // Envia para o Telegram
-      enviarMensagemTelegram(mensagem);
+    // Envia para o Telegram
+    enviarMensagemTelegram(mensagem);
 
   }
 

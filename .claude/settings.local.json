@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find C:UsersUsuarioDocumentsPlatformIOProjectscontrole_temperatura -type d ! -path */.pio/* ! -path */.git/*)"
+    ]
+  }
+}

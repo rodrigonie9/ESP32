@@ -89,7 +89,7 @@ void hw_lerTodos(){
     temp = bus.getTempCByIndex(mapa[i].indice);
 
     // 2º tentatica em caso de erro
-    if (temp = DEVICE_DISCONNECTED_C) {
+    if (temp == DEVICE_DISCONNECTED_C) {
       delay(10);
       bus.requestTemperatures();
       temp = bus.getTempCByIndex(mapa[i].indice);

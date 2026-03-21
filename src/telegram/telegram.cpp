@@ -173,11 +173,6 @@ void enviarMensagemTelegram(String mensagem) {
     return; // Sai da função
   }
 
-  // ===== URL ENCODE SIMPLES =====
-  mensagem.replace(" ", "%20");    // Espaços
-  mensagem.replace("\n", "%0A");   // Quebra de linha
-  mensagem.replace("°", "%C2%B0"); // Grau
-
   // Envia para todos os Chat IDs
   for (int i = 0; i < TOTAL_CHATS; i++) {
 
@@ -186,21 +181,19 @@ void enviarMensagemTelegram(String mensagem) {
     // Monta a URL da API do Telegram
     String url = "https://api.telegram.org/bot";
     url += TELEGRAM_BOT_TOKEN;
-    url += "/sendMessage?chat_id=";
-    url += chatIDs[i];
-    url += "&text=";
-    url += mensagem;
-
-    //Serial.print("Enviando para: ");
-    //Serial.println(chatIDs[i]);
-
+    url += "/sendMessage";
+ 
     http.begin(url);               // Inicia conexão
 
+    String body = "{\"chat_id\":\""; //Monta (JSON) mensage, chaI_id e o text
+    body += chatIDs[i];
+    body += "\",\"text\":\"";
+    body += mensagem;
+    body += "\"}";
+  
+    http.addHeader("Content-Type", "application/json"); //informa body é um JSON 
 
-    int httpCode = http.GET();
-
-    //Serial.print("[Telegram] HTTP Code: ");
-    //Serial.println(httpCode);
+    int httpCode = http.POST(body); //envia post com body JSON
 
     http.end();                    // Fecha conexão
 

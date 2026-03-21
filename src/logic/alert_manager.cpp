@@ -99,7 +99,64 @@ void alert_setModoManutencao(const String& id_fisico, uint8_t horas) {
     }
 }
 
+// --- FUNÇÃO PRINCIPAL DE LÓGICA ---
+void processarLogicaAlertas() {
+    auto cadastrados = registry_getTodos();
 
+    for (const auto& s : cadastrados) {
+
+        if (!s.monitoramento_ativo) continue;
+
+        // 1 - Verifica Modo Manutenção (MUDO)
+        //  maior que zero = está em manutenção
+        if (s.mudo_ate > 0) {
+            // millis() = tempo atual desde que a esp32 ligou, desligou - retorna a zero, aproximadamente após 49 dias após ser ligada
+            if (millis() < s.mudo_ate) continue;
+            else {
+                SensorConfig s_upd = s;
+                s_upd.mudo_ate = 0;
+                registry_salvar(s_upd);
+            }
+        }
+
+        // 2 - Verifica Agenda
+        if (!estaNoHorarioDeMonitoramento(s)) {
+            // Se está fora do horário, "Limpamos a memória" de alertas desse sensor
+            // Primeiro descobrimos qual é o índice (idx) deste sensor na nossa lista de estados
+            int idx = -1;
+            for (int i = 0; i < hw_getContagem(); i ++) {
+                if (hw_getID(i) == s.id_fisico) {
+                    idx = i;
+                    break;
+                }
+            }
+            
+            // Se achamos o sensor, zeramos todos os alertas dele
+            if (idx != -1) {
+                estados[idx].inicioAlertaSuave = 0;
+                estados[idx].inicioAlertaCritico = 0;
+                estados[idx].alertaEnviado = false;
+            }
+
+            continue; // pula para o próximo sensor, pois está no horário de folga
+        
+        }
+
+        // Pega temperatura
+        float temp = hw_getTemp(s.id_fisico);
+
+        if (temp == DEVICE_DISCONNECTED_C) continue;
+
+        // pegamos o índice interno para gerenciar o tempo
+        int idx = -1;
+        for (int i = 0; i < hw_getContagem(); i++) {
+
+        }
+
+        
+
+    }
+}
 
 
 
