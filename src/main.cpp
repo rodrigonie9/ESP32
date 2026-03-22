@@ -52,8 +52,8 @@ const char* URL_FIRMWARE =
 "https://raw.githubusercontent.com/rodrigonie9/ESP32/main/firmware/firmware.bin";
 
 // Flag que indica pedido de atualização
-bool solicitarOTA = false;
-
+// volatile (sempre buscar real valor da memória), sem otimizar
+volatile bool solicitarOTA = false;
 
 // ====================== CONTROLE DE TEMPO ======================
 unsigned long ultimoEnvio = 0;              // Guarda o tempo do último envio
