@@ -164,7 +164,8 @@ void cancelarPedidoOTA() {
 // ====================== FUNÇÃO TELEGRAM ======================
 
 // Função que envia mensagem para todos os chats cadastrados
-void enviarMensagemTelegram(String mensagem) {
+// const String& = recebe por referência não cópia - evita alocação desncessária
+void enviarMensagemTelegram(const String& mensagem) {
 
   // Verifica se tem internet
   if (!internetDisponivel()) {
@@ -179,25 +180,29 @@ void enviarMensagemTelegram(String mensagem) {
     HTTPClient http;               // Cria cliente HTTP
 
     // Monta a URL da API do Telegram
-    String url = "https://api.telegram.org/bot";
-    url += TELEGRAM_BOT_TOKEN;
-    url += "/sendMessage";
- 
+    // char[] com snprintf - sem alocaçao na heap, tamanho fixo no stack
+    // 256 char suficientes para URL com token (148 chars fixos + margem)
+    char url[256];
+    snprintf(url, sizeof(url), "https://api.telegram.org/bot%s/sendMessage", TELEGRAM_BOT_TOKEN);
+
     http.begin(url);               // Inicia conexão
 
-    String body = "{\"chat_id\":\""; //Monta (JSON) mensage, chaI_id e o text
-    body += chatIDs[i];
-    body += "\",\"text\":\"";
-    body += mensagem;
-    body += "\"}";
-  
+    //512 chars para o body - cobre mensagens longas do relatório
+    char body[512];
+    snprintf(body, 
+             sizeof(body),
+            "{\"chat_id\":\"%s\",\"text\":\"%s\"}",
+            chatIDs[i], 
+            mensagem.c_str());
+
     http.addHeader("Content-Type", "application/json"); //informa body é um JSON 
 
     int httpCode = http.POST(body); //envia post com body JSON
 
     http.end();                    // Fecha conexão
 
-    delay(500);                    // Evita bloqueio da API
+    yield();                       // API telegram (limite 30msg/s para mesmo número)
+                                   // envios consecutivos - yield() para sistema respirar entre envios
   }
 }
 

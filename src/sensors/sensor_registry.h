@@ -60,7 +60,9 @@ struct SensorConfig {
 void registry_iniciar();
 bool registry_salvar(const SensorConfig& config);
 bool registry_remover(const String& id_fisico);
-String registry_getNome(const String& id_fisico);
+const String& registry_getNome(const String& id_fisico);
 bool registry_buscarPorID(const String& id_fisico, SensorConfig& config);
 std::vector<SensorConfig> registry_getTodos();
+
+
 

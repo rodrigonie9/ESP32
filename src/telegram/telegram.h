@@ -16,7 +16,7 @@
 #include <Arduino.h>
 
 // Função responsável por enviar mensagens via Telegram
-void enviarMensagemTelegram(String mensagem);
+void enviarMensagemTelegram(const String& mensagem);
 
 //Funções OTA
 // Verifica mensagens do Telegram (getUpdates)

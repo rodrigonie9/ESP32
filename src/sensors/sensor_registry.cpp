@@ -6,12 +6,14 @@
 #include <Preferences.h>            // para acessar nvs
 #include <ArduinoJson.h>            // biblioteca json, transformar lista de sensores em texto (json), salvar na memória
 
+#include "../telegram/telegram.h"   
+
 #define NVS_NAMESPACE_SENSORS "sensors_reg"     //espaço na nvs para salvar dados
 #define NVS_KEY_CONFIG "config_json"
 
 static Preferences prefs;                       // prefs para acessar a nvs
  // lista em RAM, esp32 iga, lê na nvs e joga para aqui, para ter acesso rápido
-static std::vector<SensorConfig> sensoresCadastrados;      
+static std::vector<SensorConfig> sensoresCadastrados;  
 
 
 // salva todos os dados do sensores em uma lista JSON
@@ -106,8 +108,13 @@ void registry_iniciar () {
 
             s.mudo_ate = 0; // Reset do modo mudo ao reiniciar
             sensoresCadastrados.push_back(s);
-        }
+        } 
         LOG("Registry: " + String(sensoresCadastrados.size()) + " sensores.");
+
+    } else {
+        LOG("ERRO: Falha ao carregar sensores do NVS: " + String(error.c_str()));
+        enviarMensagemTelegram("ERRO CRÍTICO: Falha ao carregar sensores da memória. Nenhum sensor monitorado\n"
+                               "Tente reiniciar a placa. Caso o erro persista entre em contato com o técnico");  
     }
 }
 
@@ -152,7 +159,7 @@ bool  registry_remover(const String& id_fisico) {
 
 // Busca o nome amigável, se não encontrar retorna o ID próprio
     // retorna nome amigável, muito usado pelo telegram
-String registry_getNome(const String& id_fisico) {
+const String& registry_getNome(const String& id_fisico) {
     for (const auto& s : sensoresCadastrados) {
         if (s.id_fisico == id_fisico){
             return s.nome_amigavel;

@@ -92,7 +92,7 @@ void alert_setModoManutencao(const String& id_fisico, uint8_t horas) {
     if (registry_buscarPorID(id_fisico,s)) {
         // converte horas em milisegundos
         // define até quando o sensor vai ficar mudo
-        s.mudo_ate = millis() + ((unsigned long)horas *3600000);
+        s.mudo_ate = millis() + ((unsigned long)horas *3600000UL);        //transforma 3600000 em Long, int é menor e pode ser negativo
         // grava na memória até quando vai ficar mudo
         registry_salvar(s);
         LOG("Alerta: " + s.nome_amigavel + " silenciado por " + String(horas) + "h");
@@ -110,8 +110,13 @@ void processarLogicaAlertas() {
         // 1 - Verifica Modo Manutenção (MUDO)
         //  maior que zero = está em manutenção
         if (s.mudo_ate > 0) {
-            // millis() = tempo atual desde que a esp32 ligou, desligou - retorna a zero, aproximadamente após 49 dias após ser ligada
-            if (millis() < s.mudo_ate) continue;
+            // ATENÇÃO: millis() retorna milisecondes desde o boot e transborda para 0 após ~49 dias
+            // Nunca usar comparação direta(millis() < alvo), usar subtração (millis()- alvo)
+            // MELHORIA:
+            // millis() transbora após ~49 dias, 
+            // comparando (millis() < mudo_ate), após overflow millis fica menor, que mudo_ate , sensor fica mudo para sempre
+            // (millis() - mudo_ate) funciona bem com overflow, subtração do unsigned long transbor de forma previsível
+            if ((long)(millis() - s.mudo_ate) < 0) continue;
             else {
                 SensorConfig s_upd = s;
                 s_upd.mudo_ate = 0;

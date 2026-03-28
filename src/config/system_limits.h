@@ -7,3 +7,5 @@
 // Intervalos de tempo (em milissegundos)
 #define INTERVALO_LEITURA_SENSORES_MS 120000 // 2 minutos  leitura dos sensores
 #define INTERVALO_RELATORIO_ROTINA_MS 900000 // 15 minutos 
+
+#define TEMP_ALERTA_PADRAO 10.0 //falback (segurança)- apenas  se naõ for configurado ou erro no webportal

@@ -18,7 +18,13 @@ void conectarWiFi() {
   // 2 - wm.resetSettings();   // Apaga Wi-Fi salvo
 
   WiFiManager wm;             // Cria o objeto WiFiManager
+
   //wm.resetSettings();       // reseta configução de internet()senhas salvas
+
+  //aguarda até 90' para roteador subir após quedas de energia
+  //sem isso, esp32 reinicia em loop enquanto roteador ainda está inicializando
+  wm.setConnectTimeout(90);
+  
   bool conectado = wm.autoConnect("ESP32_Config","12345678");
 
   // Verifica se conseguiu conectar
@@ -35,25 +41,33 @@ void conectarWiFi() {
       return false;
     }
 
+    // testa multiplos EndPoints - se qualquer um responder, há internet
+    // evita falso negativo caso um serviço esteja bloqueado ou instável
+    const char* endpoints[] {
+          "http://www.google.com/generate_204",               //Goole
+          "http://www.msftconnecttest.com/connecttest.txt",   // Microsoft
+          "http://connectivitycheck.gstatic.com/generate_204" // Android
+    };
+    
     HTTPClient http;
     // cria cliente http
 
     http.setTimeout(3000);
     // define timeout para evitar travamento
 
-    http.begin("http://www.google.com/generate_204");
-    // Endpoint usado para teste rápido de conectividade
+    for (const char* url : endpoints){
+      http.begin(url);
+      int codigo = http.GET();
+      http.end();
+      if (codigo > 0) return true;
+    }
+    
+    return false;
 
-    int codigo = http.GET();
-    // executa requisição de http
-
-    http.end();
-    // libera recursos
-
-    return (codigo>0);
     // http.GET() > retorna numero positivo se conseguiu acesso a internet , negativo em caso de erro (time out , dns falho, sem internet)
     // se recebeu resposta, considera que há internet
   }
+
 
   // Tenta recuperar conexão com a internet
   bool tentarRecuperarInternet(int tentativas){
@@ -63,19 +77,17 @@ void conectarWiFi() {
       WiFi.disconnect();
       // desconecta wifi atual
 
-      delay(1000);
-      // aguarda estabilizar
+      // Aguarda 500ms em fatias de 10ms, chamando yield() a cada fatia
+      // mantem watchdog alimentado e sistema responsivo
+      for (int t = 0; t < 50; t++) {delay(10); yield();} // aguarda estabilizar
 
-      WiFi.reconnect();
-      // solicita reconexão ao roteador
+      WiFi.reconnect();                                  //solicita reconexão ao roteador
+      
+      // aguarda tentativa de conexão 2000ms em fatias, 2' suficietn para wifi reconectar
+      for (int t = 0; t < 200; t++) { delay(10); yield(); }
 
-      delay(3000);
-      // aguarda tentativa de conexão
-
-      if (temInternet()) {
+      if (temInternet()) return true;
         // se coneseguiu internet, retornar sucesso
-        return true;
-      }
     }
 
     //  se chegou aqui, não conseguiu recuperar

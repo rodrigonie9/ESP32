@@ -25,8 +25,8 @@ void hw_iniciar();         // Inicializa o barramento 1-Wire e detecta sensores
 void hw_lerTodos();             // Faz a leitura física de todos os sensores
 
 // ================= FUNÇÕES DE INFORMAÇÃO (O que consulta a RAM) =================
-uint8_t hw_getContagem();                       // Quantos senores respondem no fio agora
-String hw_getID(uint8_t indice);               // Pega o ID (ROM) pela posição
+uint8_t hw_getContagem();                             // Quantos senores respondem no fio agora
+const String& hw_getID(uint8_t indice);               // Pega o ID (ROM) pela posição
 
 float hw_getTemp(const String& id_fisico);
 

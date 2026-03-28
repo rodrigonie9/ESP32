@@ -55,6 +55,11 @@ const char* URL_FIRMWARE =
 // volatile (sempre buscar real valor da memória), sem otimizar
 volatile bool solicitarOTA = false;
 
+//Controla se hora foi sincronizada via NTP
+// false = sem hora, agendas desativadas
+// revertida para true no loop() quando NTP responder
+bool horaEstaSincronizada = false;
+
 // ====================== CONTROLE DE TEMPO ======================
 unsigned long ultimoEnvio = 0;              // Guarda o tempo do último envio
 const unsigned long INTERVALO = 120000;      //  
@@ -83,20 +88,24 @@ void setup() {
 
   // ====================== CONEXÃO WI-FI ========================================
   // O valor -10800 é: -3 horas * 3600 segundos // ajustar fuso
-  configTime(-10800, 0, "pool.ntp.org", "time.nist.gov");
+  configTime(-10800, 0, "pool.ntp.org", "time.nist.gov", "time.google.com");
   LOG("Sincronizando hora via NTP...");
   
   //tenta garantir que pegou a hora certa (usa delay, até 5s em 10 tentativas)
   struct tm timeinfo;
   int tentativas = 0;
-  while(!getLocalTime(&timeinfo) && tentativas < 10) {
-    delay(500);
+  while(!getLocalTime(&timeinfo) && tentativas < 20) {
+    delay(1000);
     tentativas++;
   }
-  if(tentativas < 10) {
+  if(tentativas < 20) {
     LOG("NTP sincronizado com sucesso");
+    horaEstaSincronizada = true;
   } else {
     LOG("NTP falhou - continuando sem hora sincronizada");
+    // sem NTP as agendas não funcionam - avisa o usuário via telegram
+    enviarMensagemTelegram("AVISO: Falha ao sincronizar hora (NTP). Agendas desativas até o próximo reboot\n"
+                            "Contatar o técnico para verificar a placa");
   }
   
   // ====================== DEFINE HOSTNAME USADO PELA PLACA ======================
@@ -111,6 +120,13 @@ void setup() {
   } else {
     LOG("Falha ao iniciar mDNS");
   }
+
+
+  // ====================== INICIA TELEGRAM =====================
+  // pega na NVS úlitmo ID de mensagem do telegram, com a mensagem /update
+  iniciarTelegramNVS();
+
+
   
   // ====================== SENSORES ======================
   // Iniciar sensores Hardwatre
@@ -122,15 +138,10 @@ void setup() {
 
 
 
-
   // ====================== INICIAR WEB PORTAL ======================
   iniciarWebPortal();
   LOG("Servido Web iniciado");
 
-
-  // ====================== INICIA TELEGRAM =====================
-  // pega na NVS úlitmo ID de mensagem do telegram, com a mensagem /update
-  iniciarTelegramNVS();
 
   // ====================== INFO FINAL ======================
   LOG("IP local:");
@@ -192,9 +203,11 @@ void loop() {
 
     for (uint8_t i = 0; i < totalSensoresNoFio; i++) {
 
-      String id_fisico = hw_getID(i);
+      // & = "não copia, usa o texto original"
+      // const = "promete não modificar"
+      const String& id_fisico = hw_getID(i);
       float temp = hw_getTemp(id_fisico);
-      String nome_amigavel = registry_getNome(id_fisico);
+      const String& nome_amigavel = registry_getNome(id_fisico);
 
       if (temp == SENSOR_ERRO) {
           snprintf(linha, sizeof(linha), "- %s: ERRO\n", nome_amigavel.c_str());
@@ -217,8 +230,19 @@ void loop() {
   }
     
 
+  //
+  if (!horaEstaSincronizada) {
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)){
+      horaEstaSincronizada = true;
+      LOG("NTP sincronizado tardiamente");
+      enviarMensagemTelegram("Hora sincronizada. Agendas reativadas");
+    }
+  }
   // pequeno delay para aliviar o cpu
-  delay(50);
+  // permite esp32 processe tarefas internas (wifi stack, FreeRTOS, Wachtdog) sem bloquear por tempo fixo (delay(50))
+  // loop roda mais rápido, webPortalLoop mais responsivo
+  yield();
 
   // termina loop
   }

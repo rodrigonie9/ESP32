@@ -20,8 +20,9 @@ String gerarNomePadrao() {
     // Buffer para montar o nome
 
     // Cria um nome baseado nos últimos bytes do MAC
-    sprintf(
+    snprintf(
         nome,
+        sizeof(nome),                   
         "esp32-%02X%02X%02X",
         (uint8_t)(chipid >> 16),
         (uint8_t)(chipid >> 8),
@@ -67,7 +68,9 @@ String getNomePlaca() {
 void setNomePlaca(const String& novoNome) {
 
     // Validação mínima
-    if (novoNome.length() < 3) return;
+    // && E> verdadeiro quando ambas condições são verdadeiras
+    // || OU> verdadeiro quando pelo menos uma condição é verdadeira
+    if (novoNome.length() < 3 || novoNome.length() > 32) return;
 
     // Abre NVS
     prefsDevice.begin(DEVICE_NVS_NAMESPACE, false);

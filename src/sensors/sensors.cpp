@@ -90,7 +90,7 @@ void hw_lerTodos(){
 
     // 2º tentatica em caso de erro
     if (temp == DEVICE_DISCONNECTED_C) {
-      delay(10);
+      yield();   //pequena pausa sem usar delay() 
       bus.requestTemperatures();
       temp = bus.getTempCByIndex(mapa[i].indice);
     }
@@ -113,7 +113,7 @@ uint8_t hw_getContagem() {
   return totalDetectados; 
 }
 
-String hw_getID (uint8_t indice) {
+const String& hw_getID (uint8_t indice) {
   if (indice < totalDetectados) {
     return mapa[indice].id;
   } else {

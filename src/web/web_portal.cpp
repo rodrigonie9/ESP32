@@ -6,6 +6,7 @@
 #include "sensors/sensors.h"
 #include "sensors/sensor_registry.h"
 #include "debug.h"
+#include "../config/system_limits.h"
 
 WebServer server(80);
 
@@ -40,7 +41,8 @@ void handleRoot() {
     // --- SEÇÃO 1: NOME DA PLACA ---
     String cardPlaca = "<div class='card'><h2>Configuração da Placa</h2>";
     cardPlaca += "<form action='/config/placa' method='POST'>";
-    cardPlaca += "Nome: <input type='text' name='nome' value='" + getNomePlaca() + "'> ";
+    //Limita nome a 32 chars
+    cardPlaca += "Nome: <input type='text' name='nome' value='" + getNomePlaca() + "' maxlength='32' required> ";
     cardPlaca += "<input type='submit' value='Salvar' class='btn btn-primary'></form></div>";
     server.sendContent(cardPlaca);
 
@@ -72,8 +74,10 @@ void handleRoot() {
             String row = "<tr><td><code>" + id + "</code></td>";
             row += "<td><form action='/config/sensor' method='POST' style='display:inline;'>";
             row += "<input type='hidden' name='id' value='" + id + "'>";
-            row += "<input type='text' name='nome' placeholder='Nome' required> ";
-            row += "<input type='number' step='0.1' name='max' value='30.0' style='width:60px;'> ";
+            //Máximo 32 caracteres
+            row += "<input type='text' name='nome' placeholder='Nome' maxlength='32' required> ";
+            // min= -50   max=30   impede valores vazios
+            row += "<input type='number' step='0.1' name='max' value='30.0' min='-50' max='100' style='width:60px;' required> ";
             row += "<input type='submit' value='Cadastrar' class='btn btn-primary'></form></td></tr>";
             server.sendContent(row);
         }
@@ -88,7 +92,11 @@ void handleRoot() {
 //Funções que recebem o que o usário digitou e salvam na memória
 void handleConfigPlaca() {
   if (server.hasArg("nome")) {
-    setNomePlaca(server.arg("nome"));
+    String nome = server.arg("nome");
+    // rejeita nomes maiores de 32 caracteres - já bloqueado no HTML (web_portal)
+    if (nome.length() > 0 && nome.length() <=32) {
+        setNomePlaca(nome);
+    }
   }
   server.sendHeader("Location", "/");
   server.send(303);
@@ -96,10 +104,28 @@ void handleConfigPlaca() {
 
 void handleConfigSensor(){
   if (server.hasArg("id") && server.hasArg("nome")) {
+    String nome = server.arg("nome");
+    //rejeita nome vazio ou acima de 32 caracteres
+    if (nome.length() == 0 || nome.length() > 32){
+       server.sendHeader("Location","/");
+       server.send(303); 
+       return;
+    }
+    
+    String maxStr = server.arg("max");
+    // Verifica se o campo tem contéudo digital, sinal ou ponto
+    // toFloat() retorna 0.0 tanto para "0" legítico quando para "abc" inválido
+    // chechar o primeiro caractere é a única forma segura de distribuir os dois
+    bool tempValida = maxStr.length() > 0 &&
+                      (isdigit(maxStr[0]) || maxStr[0] == '-' || maxStr[0] == '.');
+    
     SensorConfig s;
     s.id_fisico = server.arg("id");
-    s.nome_amigavel = server.arg("nome");
-    s.temp_max_alerta = server.arg("max").toFloat();
+    s.nome_amigavel = nome;  
+    //condição ? valor_se_verdadeiro : valor_se_falso
+    // if / else em uma só linha
+    //       condição              ? valor_se_true    : valor_se_falso
+    s.temp_max_alerta = tempValida ? maxStr.toFloat() : TEMP_ALERTA_PADRAO;
     s.monitoramento_ativo = true;
     registry_salvar(s);
   }
