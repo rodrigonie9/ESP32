@@ -34,7 +34,9 @@ const char WEB_STYLE[] PROGMEM = R"rawliteral(
 void handleRoot() {
     // Avisa o navegador que vamos enviar o site em partes (chunks)
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    server.send(200, "text/html", "<!DOCTYPE html><html><head><meta charset='utf-8'>");
+    //refresh a cada DOIS minutos
+    server.send(200, "text/html", "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+                                "<meta http-equiv='refresh' content='120'>");
     server.sendContent(WEB_STYLE);
     server.sendContent("</head><body><h1>Monitor de Temperatura</h1>");
 

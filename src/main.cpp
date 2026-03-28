@@ -230,7 +230,7 @@ void loop() {
   }
     
 
-  //
+  // Se hora não foi sincronizada no boor, tenta novamente
   if (!horaEstaSincronizada) {
     struct tm timeinfo;
     if (getLocalTime(&timeinfo)){
@@ -239,6 +239,22 @@ void loop() {
       enviarMensagemTelegram("Hora sincronizada. Agendas reativadas");
     }
   }
+
+  // Reboot diário às 03:00 - limpa heap fragmentado, reset wi-fo preso
+  // grante nova sincronização NTP todos os dias
+  // só executa se a hora estiver sincronizada, evita reeboot em hora errada
+  if (horaEstaSincronizada){
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      if (timeinfo.tm_hour == 3 && timeinfo.tm_min == 0){
+        LOG("Reboot diário programado - reiniciando");
+        enviarMensagemTelegram("Reboot diário programado. Voltando em instantes.");
+        delay(500);
+        ESP.restart();
+      }
+    }
+  }
+
   // pequeno delay para aliviar o cpu
   // permite esp32 processe tarefas internas (wifi stack, FreeRTOS, Wachtdog) sem bloquear por tempo fixo (delay(50))
   // loop roda mais rápido, webPortalLoop mais responsivo
