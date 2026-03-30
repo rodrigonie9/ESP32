@@ -25,31 +25,21 @@ static void gravarNoNVS(){
     //para cada sensor na nossa lista[], criamos um objeto{} no JSON
     for (const auto& s : sensoresCadastrados) {
         JsonObject obj = array.add<JsonObject>();
-        obj["id_fisico"] = s.id_fisico;
-        obj["nome_amigavel"] = s.nome_amigavel;
-        obj["temp_max_alerta"] = s.temp_max_alerta;
-        obj["tempo_espera_min"] = s.tempo_espera_min;
-        obj["temp_critica"] = s.temp_critica;
-        obj["monitoramento_ativo"] = s.monitoramento_ativo;
-        obj["horas_mudo_padrao"] = s.horas_mudo_padrao;
-        obj["modo"] = (int)s.modo;
-
-        // Uso Agenda
-        obj["usar_agenda"] = s.usar_agenda;
-
-        // Dados da Agenda Semanal
-        obj["dia_desliga_semanal"] = s.dia_desliga_semanal;
-        obj["hora_desliga_semanal"] = s.hora_desliga_semanal;
-        obj["min_desliga_semanal"] = s.min_desliga_semanal;
-        obj["dia_religa_semanal"] = s.dia_religa_semanal;
-        obj["hora_religa_semanal"] = s.hora_religa_semanal;
-        obj["min_religa_semanal"] = s.min_religa_semanal;
-
-        // Dados da Agenda Diária
-        obj["hora_desliga_diaria"] = s.hora_desliga_diaria;
-        obj["min_desliga_diaria"] = s.min_desliga_diaria;        
-        obj["hora_religa_diaria"] = s.hora_religa_diaria;
-        obj["min_religa_diaria"] = s.min_religa_diaria;
+        obj["id_fisico"]            = s.id_fisico;
+        obj["nome_amigavel"]        = s.nome_amigavel;
+        obj["temp_max_alerta"]      = s.temp_max_alerta;
+        obj["tempo_espera_min"]     = s.tempo_espera_min;
+        obj["temp_critica"]         = s.temp_critica;
+        obj["monitoramento_ativo"]  = s.monitoramento_ativo;
+        obj["horas_mudo_padrao"]    = s.horas_mudo_padrao;
+        
+        // ── AGENDA (novo formato bitmask) ──
+        obj["dias_monitoramento"]   = s.dias_monitoramento;    // bitmask dos dias ativos    
+        obj["agenda_horario_ativo"] = s.agenda_horario_ativo;  // true = usa janela de horário
+        obj["hora_inicio"]          = s.hora_inicio;   
+        obj["min_inicio"]           = s.min_inicio;    
+        obj["hora_fim"]             = s.hora_fim;      
+        obj["min_fim"]              = s.min_fim; 
 
     }
 
@@ -87,24 +77,17 @@ void registry_iniciar () {
             s.temp_critica = obj["temp_critica"].as<float>();
             s.monitoramento_ativo = obj["monitoramento_ativo"].as<bool>();
             s.horas_mudo_padrao = obj["horas_mudo_padrao"].as<uint8_t>();
-            s.modo = (ModoMonitoramento)obj["modo"].as<int>();
-
-            // Uso de Agenga
-            s.usar_agenda = obj["usar_agenda"].as<bool>();
-
-            // Agenda Semanal
-            s.dia_desliga_semanal = obj["dia_desliga_semanal"].as<uint8_t>();
-            s.hora_desliga_semanal = obj["hora_desliga_semanal"].as<uint8_t>();
-            s.min_desliga_semanal = obj["min_desliga_semanal"].as<uint8_t>();
-            s.dia_religa_semanal = obj["dia_religa_semanal"].as<uint8_t>();
-            s.hora_religa_semanal = obj["hora_religa_semanal"].as<uint8_t>();
-            s.min_religa_semanal = obj["min_religa_semanal"].as<uint8_t>();
-
-            // Agenda Diária
-            s.hora_desliga_diaria = obj["hora_desliga_diaria"].as<uint8_t>();
-            s.min_desliga_diaria = obj["min_desliga_diaria"].as<uint8_t>();
-            s.hora_religa_diaria = obj["hora_religa_diaria"].as<uint8_t>();
-            s.min_religa_diaria = obj["min_religa_diaria"].as<uint8_t>();
+            
+    
+            // ── AGENDA (novo formato bitmask) ──
+            // O " | valor" é o padrão caso a chave não exista no NVS
+            // (segurança para sensores cadastrados antes desta atualização)
+            s.dias_monitoramento   = obj["dias_monitoramento"]   | 127;   // 127 = 0b1111111 = todos os dias
+            s.agenda_horario_ativo = obj["agenda_horario_ativo"] | false; // padrão: 24h
+            s.hora_inicio          = obj["hora_inicio"]          | 0;
+            s.min_inicio           = obj["min_inicio"]           | 0;
+            s.hora_fim             = obj["hora_fim"]             | 0;
+            s.min_fim              = obj["min_fim"]              | 0;
 
             s.mudo_ate = 0; // Reset do modo mudo ao reiniciar
             sensoresCadastrados.push_back(s);

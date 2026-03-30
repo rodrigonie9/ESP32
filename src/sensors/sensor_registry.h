@@ -1,7 +1,5 @@
 // BANCO DE DADOS - cadastro  / NVS
 
-
-
 #pragma once
 
 
@@ -21,40 +19,41 @@
 
 
 // ================= CONFIGURAÇÃO =================
-enum ModoMonitoramento {
-    SEMPRE_24H = 0,
-    AGENDA_SEMANAL = 1,
-    AGENDA_DIARIA = 2
-};
-
-
-// Estrutura do cadastro do sensor
+//Estrutura do cadastro do sensor
+// Ficha de cada sensor
 struct SensorConfig {
-    String id_fisico;           // ID físico do DS18B20
-    String nome_amigavel;       // nome definifo pelo usuário
-    float temp_max_alerta;      // Limite para o alerta
-    uint16_t tempo_espera_min;  // Tempo para ignorar temperatua alta
-    float temp_critica;         // Limite grave, se atingir avisa imediatamente
-    bool monitoramento_ativo;   // Monitoramento Ligado/Desligado
+    String id_fisico;               //  ID Fisico sensor DS18B20
+    String nome_amigavel;           // nome definido pelo usuário
+    float temp_max_alerta;          // Limite para o alerta
+    uint16_t tempo_espera_min;      // Tempo para igonorar temperatura alta
+    float temp_critica;             // Limite grave, avisa imediatamente
+    bool monitoramento_ativo;       // Monitoramento ligado / desligado
+    unsigned long mudo_ate;         // Timestamp para modo manutenção (0 = normal)
+    uint8_t horas_mudo_padrao;      // Duração botão de silencio (1h, 2h,....24h)
 
-    unsigned long mudo_ate;     // Timestamp para modo manutenção (0 = nornmal)
-    uint8_t horas_mudo_padrao;  // Usuário define se botão silencia por 1h, 2, 24h
+// ── AGENDA DE MONITORAMENTO// ──────────────────────────────────────────
+// Bitmask dos dias em que o monitoramento está ativo.
+// Cada bit representa um dia da semana:
+//   bit 0 = Domingo, bit 1 = Segunda, ..., bit 6 = Sábado     
+// Exemplo: só dias úteis → 0b0111110 = 62
+// Exemplo: todos os dias → 0b1111111 = 127
+    uint8_t dias_monitoramento;
 
-    bool usar_agenda;           // True = segue agenda - falso = 24h por dia
-    
-    // Modo de Monitoramento
-    ModoMonitoramento modo;
+//Se false: nos dias ativos monitora 24h
+//Se true: só monitora janela hora_inicio > hora_fim
+    bool agenda_horario_ativo;
 
-    // Para Agenda Semanal (Ex: Sábado 19:00 até Segunda 08:30)
-    // DIA SEMANA 0 - 6
-    uint8_t dia_desliga_semanal, hora_desliga_semanal, min_desliga_semanal;   
-    uint8_t dia_religa_semanal, hora_religa_semanal, min_religa_semanal;
+// Hora e minuto em que monitoramento LIGA(0-23 / 0 ou 30)
+// só aceita em 30 em 30 minutos
+    uint8_t hora_inicio;
+    uint8_t min_inicio;
 
+// Hora e minuto em que o monitoramento DESLIGA(0-23 / 0 ou 30)
+// Ex.: inicio-22, fim=06, monitora das 22h até as 06h do dia seguinte
+    uint8_t hora_fim;
+    uint8_t min_fim;
 
-    // Para Agenda Diária (Ex: Todos os dias das 19:00 às 08:00)
-    uint8_t hora_desliga_diaria, min_desliga_diaria;
-    uint8_t hora_religa_diaria, min_religa_diaria;
-};
+}; // fecha struct sensor config
 
 // ================= FUNÇÕES =================
 void registry_iniciar();

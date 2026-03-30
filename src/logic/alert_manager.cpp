@@ -17,71 +17,61 @@ struct EstadoAlerta {
 static EstadoAlerta estados[MAX_SENSORES];
 
 // --- FUNÇÃO AUXILIAR: VERIFICA AGENDA ---
+// Retorna true = pode monitrar / false = fora da agenda, ignorar
 bool estaNoHorarioDeMonitoramento (const SensorConfig& s) {
-    if (s.modo == SEMPRE_24H) return true;
 
-    //estrutura timeinfo retorna timeinfo.tm_hour, _min, _sec
+    // Busca a hora atual do sistema (vinda NTP)
     struct tm timeinfo;
+    // Se relógio não estiver sincronizado, monitora por segurança
+    if (!getLocalTime(&timeinfo)) return true;
 
-    //getLocalTime, função tempo esp32, tenta obter hora atual via NTP(internet)
+    // ── PASSO 1: O DIA DE HOJE ESTÁ ATIVO NO BITMASK? ──────────────────      
+    //
+    // dias_monitoramento é um número de 8 bits — pensa como 7 lâmpadas:        
+    //   bit:  6    5    4    3    2    1    0
+    //   dia: Sab  Sex  Qui  Qua  Ter  Seg  Dom
+    //
+    // Exemplo dias úteis: 0b0111110 = 62  (bits 1 a 5 acesos)
+    // Exemplo todos dias: 0b1111111 = 127 (bits 0 a 6 acesos)
+    //
+    // Para saber se HOJE está ativo:
+    //   >> diaAtual  →  empurra os bits até o dia de hoje chegar na posição 0  
+    //   & 1          →  lê só esse bit: 1 = ativo, 0 = inativo
+    //     & 1 =  MÁSCARA: apaga todos os bits, deixa só o último (posição 0)  
+    // Exemplo: dias úteis (0b0111110), hoje = Quarta (diaAtual=3)
+    //   0b0111110 >> 3 = 0b0001111  →  & 1 = 1  →  dia ativo!
+    // Exemplo: dias úteis (0b0111110), hoje = Domingo (diaAtual=0)
+    //   0b0111110 >> 0 = 0b0111110  →  & 1 = 0  →  dia inativo
+    uint8_t diaAtual = timeinfo.tm_wday;
+    bool diaAtivo = (s.dias_monitoramento >> diaAtual) & 1;
 
-    if (!getLocalTime(&timeinfo)) return true; // se falhara hora, monitora por segurança 
+    if (!diaAtivo) return false;    //hoje não está na agenda
 
-    /*_wday, retornar dia da semana. ex. 0 dom, 1 seg 
-        vezes 1440 (numero de minutos em um dia) wday * 1440 = retorna dia da semana em minutos acumulados
-        ex: segunda = 1 * 1440
-        logo quantos minutos se passaram desde domingo 00:00
-     tm_hour - converte horas do dia em minutos
-     tm_min - miuntosv(0 a 59)
-     depois soma tudo
-     Exemplo: ex: quarta (3) - 14:25
-      3 * 1440   +    14 * 60     +  25 = 5185 desde domingo 00:00  */
-    int minAtualSemana = (timeinfo.tm_wday * 1440) + (timeinfo.tm_hour * 60) + timeinfo.tm_min;
-    int minAtualDia = (timeinfo.tm_hour * 60) + timeinfo.tm_min;
+    // ── PASSO 2: USA JANELA DE HORÁRIO? ────────────────────────────────      
+    // Se agenda_horario_ativo for false, monitora o dia inteiro (24h)
+    if (!s.agenda_horario_ativo) return true;
 
-    // MODO AGENDA SEMANAL
-    if (s.modo == AGENDA_SEMANAL) {
-        //calcula hora em minutos que desliga - depois compara com minutos atual
-        int minDesliga = (s.dia_desliga_semanal * 1440) + (s.hora_desliga_semanal * 60) + s.min_desliga_semanal;
-        //calcula hora em minutos que religa - depois compara com minutos atual
-        int minReliga = (s.dia_religa_semanal * 1440) + (s.hora_religa_semanal * 60) + s.min_religa_semanal;
-
-        
-    //AGENDA SEMANAL
-        // Confere se está dentro do período DESLIGADO
-          // horário de Desligar e Religar está dentro da semana semana, sem virar o relógio
-        if (minDesliga < minReliga) {
-            // hora atual MAIOR ou IGUAL a hora desligar E menor hora de religar
-            // Estamos dentro do período de monitoramento DESLIGADO?
-            if (minAtualSemana >= minDesliga && minAtualSemana < minReliga) return false;
-          // Período desligado atravess o final de semana (desliga sexta 7800 min) religa segunda(360 minutos)
-        } else {
-            // Hora atual DEPOIS do horário de desliga OU ANTES do Religar
-            //  Cobre do desligar até domingo 23:59 e de domingo domingo 00:00 até religar
-            if (minAtualSemana >= minDesliga || minAtualSemana < minReliga) return false;
-        }
-    }
     
-    //AGENDA DIÁRIA
-        //Confere se está dentro do período DESLIGADO
-    else if (s.modo == AGENDA_DIARIA) {
-        // converte tudo para minutos desde 00:00
-        int minDesliga = (s.hora_desliga_diaria * 60) + s.min_desliga_diaria;
-        int minReliga = (s.hora_religa_diaria * 60) + s.min_religa_diaria;
-        
-        //Período desligado está dentro do mesmo dia ou vira o dia?
-          // 1º caso, não vira o dia
-        if (minDesliga < minReliga) {
-            // Se agora for DEPOIS de desligar E ANTES de religar
-            if (minAtualDia >= minDesliga && minAtualDia < minReliga) return false;
-          // 2º caso. vira o dia Ex: desliga 22h, religar 06h
-        } else {
-            // Se agora for DEPOIS de desligar OU ANTES  de desligar
-            if (minAtualDia >= minDesliga || minAtualDia < minReliga) return false;
-        }
+    // ── PASSO 3: ESTAMOS DENTRO DA JANELA DE HORÁRIO? ──────────────────      
+    // Converte hora atual e os limites para minutos desde 00:00
+    // Facilita comparar dois horários com uma subtração simples
+    int minAtual  = (timeinfo.tm_hour * 60) + timeinfo.tm_min;
+    int minInicio = (s.hora_inicio    * 60) + s.min_inicio;
+    int minFim    = (s.hora_fim       * 60) + s.min_fim;
 
+    // Caso 1: janela normal, não vira meia-noite (ex: 08:00 → 20:00)
+    if (minInicio <= minFim) {
+        //C++ pode retornar direto uma expressão if else / verdadeiro ou falso
+        // Retorna TRUE, se:
+        //  AGORA >= minInicio E AGORA < minFim
+        return(minAtual >= minInicio && minAtual < minFim);
     }
-    return true;
+
+    // Caso 2: janela vira meia-noite (ex.: 22:00 → 06:00)
+    // Monitora das 22h até 23:59 OU das 00:00 até as 06:00
+    // Retorna TRUE se:
+    //   AGORA >= minInicio OU agora < minFim
+    return(minAtual >= minInicio || minAtual < minFim);
 }
 
 
@@ -152,16 +142,76 @@ void processarLogicaAlertas() {
 
         if (temp == DEVICE_DISCONNECTED_C) continue;
 
-        // pegamos o índice interno para gerenciar o tempo
+        
+        // Busca o índice deste sensor na lista de hardware
+        // Precisamos do índice para acesssar estados[idx] - memória de alertas
         int idx = -1;
         for (int i = 0; i < hw_getContagem(); i++) {
-
+            if(hw_getID(i) == s.id_fisico){
+                idx = i;
+                break; // achou - pode parar de procurar
+            }
         }
 
-        
+        // Se o sensor não foi encontrado no hardware, pula
+        if (idx == -1) continue;
+
+        // ── 3. ALERTA CRÍTICO ──────────────────────────────────────────
+        // Temperatura crítica = perigo imediato, avisa na hora,  sem esperar
+        if (temp >= s.temp_critica) {
+            if(!estados[idx].alertaEnviado){
+                // String (temp,1) = temperatura com 1 casa decima. ex.: "8.3"
+                enviarMensagemTelegram("🚨 CRÍTICO: " + s.nome_amigavel + 
+                                       " está em " + String(temp,1) + "°C!");
+                estados[idx].alertaEnviado = true;
+            }
+            continue;   //não precisa checar alerta suave
+        }
+
+        // ── 4. ALERTA SUAVE ─────────────────────────────────────────────
+        // Temperatura acima do limite, mas espera tempo_espera_min antes de avisar
+        // Evita alarmes falsos por picos rápidos (ex: porta do freezer aberta)
+        if (temp > s.temp_max_alerta) {
+            if(estados[idx].inicioAlertaSuave == 0){
+                //Primeira vez acima do limite - anota o horário
+                estados[idx].inicioAlertaSuave = millis();
+            }
+
+            // Quanto tempo já está acima do limite?
+            unsigned long tempoEsperando = millis() - estados[idx].inicioAlertaSuave;
+
+            // Converte tempo_espera_min (minutos) para milisegundos
+            // 60000UL = 60.000 em unsigned long (evita overflow igual ao mudo_ate) 
+            unsigned long limiteMs = (unsigned long)s.tempo_espera_min * 60000UL;
+
+            // Se passou do tempo E ainda não avisou - manda o alerta
+            if (tempoEsperando >= limiteMs && !estados[idx].alertaEnviado){
+                enviarMensagemTelegram("⚠️ ALERTA: " + s.nome_amigavel +
+                                      " está em " + String(temp,1) + "°C há " +
+                                      String(s.tempo_espera_min) + " min!");
+                estados[idx].alertaEnviado = true;
+
+            }
+            continue;
+        }
+    // ── 5. TEMPERATURA NORMAL ───────────────────────────────────────
+    // Temperatura voltou ao normal — reseta tudo para o  próximo ciclo
+    estados[idx].inicioAlertaSuave   = 0;
+    estados[idx].inicioAlertaCritico = 0;
+    estados[idx].alertaEnviado       = false; 
 
     }
+
 }
+
+  //Para cada sensor:
+  //  ├─ Monitoramento desligado? → pula
+  //  ├─ Em manutenção (mudo)? → pula
+  //  ├─ Fora da agenda? → zera estados e pula
+  //  ├─ Sensor desconectado? → pula
+  //  ├─ Temp >= crítica? → avisa imediatamente (se ainda não avisou)
+  //  ├─ Temp >= alerta? → inicia timer → avisa após tempo_espera_min
+  //  └─ Temp normal? → zera tudo (pronto para próximo alerta)
 
 
 
