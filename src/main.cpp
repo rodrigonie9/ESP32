@@ -14,6 +14,7 @@
 #include "device/device_config.h"  // Configuração nome da placa
 #include "sensors/sensors.h"
 #include "sensors/sensor_registry.h"
+#include "logic/alert_manager.h"
 
 #include <ESPmDNS.h>              // identidade do dispositivo placa
 
@@ -147,14 +148,20 @@ void setup() {
   LOG("IP local:");
   LOG(WiFi.localIP().toString());
 
-  // Envia mensagem inicial
-  char mensagem[128];
+  // Envia mensagem inicial com IP e nome DNS
+  char mensagem[256];
   snprintf(
     mensagem,
     sizeof(mensagem),
-    "Placa %s online\nSensores detectados: %d",
+    "Placa %s online\n"
+    "Sensores detectados: %d\n"
+    "Acesse o portal:\n"
+    "IP: http://%s\n"
+    "Nome: http://%s.local",
     getNomePlaca().c_str(),
-    hw_getContagem()
+    hw_getContagem(),
+    WiFi.localIP().toString().c_str(),  //IP atribuido pelo roteador
+    getNomePlaca().c_str()              // endereço mDNS (funciona sem saber o IP)
   );
   enviarMensagemTelegram(mensagem);
 }
@@ -191,6 +198,9 @@ void loop() {
 
     // Solicita leitura de todos os sensores
     hw_lerTodos();
+
+    //Procesa lógica de alertas
+    processarLogicaAlertas();
 
     // Monta a mensagem
     char mensagem[TAMANHO_MSG]; //array de char tamanho fixo, memória liberada após sair do bloco

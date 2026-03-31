@@ -113,11 +113,13 @@ uint8_t hw_getContagem() {
   return totalDetectados; 
 }
 
+static const String _idVazio = ""; // String permanente para retorno seguro de referência
+
 const String& hw_getID (uint8_t indice) {
   if (indice < totalDetectados) {
     return mapa[indice].id;
   } else {
-    return "";
+    return _idVazio; // referência para variável permanente — nunca aponta para lugar inválido
   }
 }
 
