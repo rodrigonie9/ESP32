@@ -16,7 +16,10 @@
 //   const garante que a função não vai alterar o original por acidente, ex. dá a ficha para alguém ler,
 //      mas em um plástico, para que a pessoa não possa escrever nela
 
-
+// ── MODOS DE MONITORAMENTO ──────────────────────────────────────────
+#define DIA_DESLIGADO 0     // dia desligado - não monitora
+#define DIA_24H       1     // monitora dia inteiro
+#define DIA_HORARIO   2     // monitora só na janela configurada
 
 // ================= CONFIGURAÇÃO =================
 //Estrutura do cadastro do sensor
@@ -31,27 +34,14 @@ struct SensorConfig {
     unsigned long mudo_ate;         // Timestamp para modo manutenção (0 = normal)
     uint8_t horas_mudo_padrao;      // Duração botão de silencio (1h, 2h,....24h)
 
-// ── AGENDA DE MONITORAMENTO// ──────────────────────────────────────────
-// Bitmask dos dias em que o monitoramento está ativo.
-// Cada bit representa um dia da semana:
-//   bit 0 = Domingo, bit 1 = Segunda, ..., bit 6 = Sábado     
-// Exemplo: só dias úteis → 0b0111110 = 62
-// Exemplo: todos os dias → 0b1111111 = 127
-    uint8_t dias_monitoramento;
-
-//Se false: nos dias ativos monitora 24h
-//Se true: só monitora janela hora_inicio > hora_fim
-    bool agenda_horario_ativo;
-
-// Hora e minuto em que monitoramento LIGA(0-23 / 0 ou 30)
-// só aceita em 30 em 30 minutos
-    uint8_t hora_inicio;
-    uint8_t min_inicio;
-
-// Hora e minuto em que o monitoramento DESLIGA(0-23 / 0 ou 30)
-// Ex.: inicio-22, fim=06, monitora das 22h até as 06h do dia seguinte
-    uint8_t hora_fim;
-    uint8_t min_fim;
+// ── AGENDA POR DIA// ──────────────────────────────────────────
+// Índice: 0=Domingo, 1=Segunda, 2=Terça, 3=Quarta, 4=Quinta, 5=Sexta, 6=Sábado
+// Cada dia teu seu prórpio modo de janeça independente
+    uint8_t dia_modo[7];                // modo do dia: DIA_DESLIGADO, DIA_24H ou DIA_HORARIO
+    uint8_t dia_hora_inicio[7];         // hora que o monitoramento LIGA naquele dia (0-23)         
+    uint8_t dia_min_inicio[7];          // minuto que LIGA (0 ou 30)
+    uint8_t dia_hora_fim[7];            // hora que o monitoramento DESLIGA naquele dia (0-23)                     
+    uint8_t dia_min_fim[7];             // minuto que DESLIGA (0 ou 30)            
 
 }; // fecha struct sensor config
 

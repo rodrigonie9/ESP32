@@ -25,53 +25,37 @@ bool estaNoHorarioDeMonitoramento (const SensorConfig& s) {
     // Se relógio não estiver sincronizado, monitora por segurança
     if (!getLocalTime(&timeinfo)) return true;
 
-    // ── PASSO 1: O DIA DE HOJE ESTÁ ATIVO NO BITMASK? ──────────────────      
-    //
-    // dias_monitoramento é um número de 8 bits — pensa como 7 lâmpadas:        
-    //   bit:  6    5    4    3    2    1    0
-    //   dia: Sab  Sex  Qui  Qua  Ter  Seg  Dom
-    //
-    // Exemplo dias úteis: 0b0111110 = 62  (bits 1 a 5 acesos)
-    // Exemplo todos dias: 0b1111111 = 127 (bits 0 a 6 acesos)
-    //
-    // Para saber se HOJE está ativo:
-    //   >> diaAtual  →  empurra os bits até o dia de hoje chegar na posição 0  
-    //   & 1          →  lê só esse bit: 1 = ativo, 0 = inativo
-    //     & 1 =  MÁSCARA: apaga todos os bits, deixa só o último (posição 0)  
-    // Exemplo: dias úteis (0b0111110), hoje = Quarta (diaAtual=3)
-    //   0b0111110 >> 3 = 0b0001111  →  & 1 = 1  →  dia ativo!
-    // Exemplo: dias úteis (0b0111110), hoje = Domingo (diaAtual=0)
-    //   0b0111110 >> 0 = 0b0111110  →  & 1 = 0  →  dia inativo
+    // Descobre qual é o dia de hoje (0=Dom, 1=Seg, ... 6=Sab)
     uint8_t diaAtual = timeinfo.tm_wday;
-    bool diaAtivo = (s.dias_monitoramento >> diaAtual) & 1;
 
-    if (!diaAtivo) return false;    //hoje não está na agenda
+    // Lê o modo configurado para hoje neste sensor
+    uint8_t modo = s.dia_modo[diaAtual];
 
-    // ── PASSO 2: USA JANELA DE HORÁRIO? ────────────────────────────────      
-    // Se agenda_horario_ativo for false, monitora o dia inteiro (24h)
-    if (!s.agenda_horario_ativo) return true;
+     // ── MODO DESLIGADO ──────────────────────────────────────────────
+     // Dia configurado como desligado - não monitora
+     if (modo == DIA_DESLIGADO) return false;
 
-    
-    // ── PASSO 3: ESTAMOS DENTRO DA JANELA DE HORÁRIO? ──────────────────      
-    // Converte hora atual e os limites para minutos desde 00:00
-    // Facilita comparar dois horários com uma subtração simples
-    int minAtual  = (timeinfo.tm_hour * 60) + timeinfo.tm_min;
-    int minInicio = (s.hora_inicio    * 60) + s.min_inicio;
-    int minFim    = (s.hora_fim       * 60) + s.min_fim;
+      // ── MODO 24H ────────────────────────────────────────────────────
+      // Dia configurado para monitorar o dia todo
+      if (modo == DIA_24H) return true;
 
-    // Caso 1: janela normal, não vira meia-noite (ex: 08:00 → 20:00)
-    if (minInicio <= minFim) {
-        //C++ pode retornar direto uma expressão if else / verdadeiro ou falso
-        // Retorna TRUE, se:
-        //  AGORA >= minInicio E AGORA < minFim
-        return(minAtual >= minInicio && minAtual < minFim);
-    }
+      // ── MODO HORÁRIO ─────────────────────────────────────────────────
+      // Usar a janela configurada para ESTE dia especificamente
+      // Converte hora atual e os limites para minutos dede 00:00
+      // Ex.: 08:30 = (8 * 60) + 30 = 510 minutos do dia - facilita comparação
+      int minAtual  = (timeinfo.tm_hour              *60) + timeinfo.tm_min;
+      int minInicio = (s.dia_hora_inicio[diaAtual]   *60) + s.dia_min_inicio[diaAtual];
+      int minFim    = (s.dia_hora_fim[diaAtual]      *60) + s.dia_min_fim[diaAtual];
 
-    // Caso 2: janela vira meia-noite (ex.: 22:00 → 06:00)
-    // Monitora das 22h até 23:59 OU das 00:00 até as 06:00
-    // Retorna TRUE se:
-    //   AGORA >= minInicio OU agora < minFim
-    return(minAtual >= minInicio || minAtual < minFim);
+      // Caso 1: janela normal, não vira meia-noite (ex: 08:00 → 20:00)
+      if (minInicio <= minFim){                                 // JANELA NORMAL - não vira meia noite
+        return (minAtual >= minInicio && minAtual < minFim);    // confere se está em horário de monitoramento
+                                                                // ja retorna TRUE ou FALSE
+      }
+
+      // Caso 2: janela vira meia-noite (ex: 22:00 → 06:00)
+      // Monitora das 22h até as 23:59 OU das 00:00 até as 06:00
+      return (minAtual >= minInicio || minAtual < minFim);      // retorna TRUE ou FALSE
 }
 
 

@@ -18,6 +18,18 @@ static std::vector<SensorConfig> sensoresCadastrados;
 
 // salva todos os dados do sensores em uma lista JSON
 // essa lista é salva em apenas uma NVS, usando menos espaço
+
+//JSON DE CADA SENSOR FICA ASSIM
+//  {
+//    "nome_amigavel": "Câmara 1",
+//    "temp_max_alerta": 8.0,
+//    "dia_modo":  [1, 1, 2, 1, 1, 1, 0],
+//    "dia_hi":    [0, 0, 8, 0, 0, 0, 0],
+//    "dia_mi":    [0, 0,30, 0, 0, 0, 0],
+//    "dia_hf":    [0, 0,19, 0, 0, 0, 0],
+//    "dia_mf":    [0, 0, 0, 0, 0, 0, 0]
+//  }
+
 static void gravarNoNVS(){
     JsonDocument doc;                       //cria documento Json em Branco
     JsonArray array = doc.to<JsonArray>();  //transforma doc em um lista []
@@ -33,13 +45,22 @@ static void gravarNoNVS(){
         obj["monitoramento_ativo"]  = s.monitoramento_ativo;
         obj["horas_mudo_padrao"]    = s.horas_mudo_padrao;
         
-        // ── AGENDA (novo formato bitmask) ──
-        obj["dias_monitoramento"]   = s.dias_monitoramento;    // bitmask dos dias ativos    
-        obj["agenda_horario_ativo"] = s.agenda_horario_ativo;  // true = usa janela de horário
-        obj["hora_inicio"]          = s.hora_inicio;   
-        obj["min_inicio"]           = s.min_inicio;    
-        obj["hora_fim"]             = s.hora_fim;      
-        obj["min_fim"]              = s.min_fim; 
+        // ── AGENDA POR DIA ──
+        // Salva os 5 arrays, de 7 posições, como listas JSON
+        // Exemplo no JSON: "dia_modo:[1,1,2,1,1,0]"
+        JsonArray modos     = obj["dia_modo"].to<JsonArray>();
+        JsonArray hInicio   = obj["dia_hi"].to<JsonArray>();
+        JsonArray mInicio   = obj["dia_mi"].to<JsonArray>();
+        JsonArray hFim      = obj["dia_hf"].to<JsonArray>();
+        JsonArray mFim      = obj["dia_mf"].to<JsonArray>();
+
+        for (int i = 0; i < 7; i++) {
+            modos.add(s.dia_modo[i]);
+            hInicio.add(s.dia_hora_inicio[i]);
+            mInicio.add(s.dia_min_inicio[i]);
+            hFim.add(s.dia_hora_fim[i]);
+            mFim.add(s.dia_min_fim[i]);
+        }
 
     }
 
@@ -59,7 +80,8 @@ void registry_iniciar () {
     String json = prefs.getString(NVS_KEY_CONFIG,"[]");     // lê o testo, se não existir traz lista vazia "[]"
     prefs.end();
 
-    JsonDocument doc;
+    JsonDocument doc;                                       //ESP32 nao sava array na NVS, só consegue texto
+                                                            // por isso converte para JSON
 
     DeserializationError error = deserializeJson(doc,json); // Transforma o texto de volta em objeto JSON
                                                             // verifica erro
@@ -79,15 +101,25 @@ void registry_iniciar () {
             s.horas_mudo_padrao = obj["horas_mudo_padrao"].as<uint8_t>();
             
     
-            // ── AGENDA (novo formato bitmask) ──
-            // O " | valor" é o padrão caso a chave não exista no NVS
-            // (segurança para sensores cadastrados antes desta atualização)
-            s.dias_monitoramento   = obj["dias_monitoramento"]   | 127;   // 127 = 0b1111111 = todos os dias
-            s.agenda_horario_ativo = obj["agenda_horario_ativo"] | false; // padrão: 24h
-            s.hora_inicio          = obj["hora_inicio"]          | 0;
-            s.min_inicio           = obj["min_inicio"]           | 0;
-            s.hora_fim             = obj["hora_fim"]             | 0;
-            s.min_fim              = obj["min_fim"]              | 0;
+            // ── AGENDA POR DIA ──
+              // Carrega os arrays — se não existir no NVS, usa padrão seguro (DIA_24H = 1)
+              JsonArray modos   = obj["dia_modo"].as<JsonArray>();
+              JsonArray hInicio = obj["dia_hi"].as<JsonArray>();
+              JsonArray mInicio = obj["dia_mi"].as<JsonArray>();
+              JsonArray hFim    = obj["dia_hf"].as<JsonArray>();
+              JsonArray mFim    = obj["dia_mf"].as<JsonArray>();
+
+              for (int i = 0; i < 7; i++) {
+                  // modos[i] | DIA_24H → se não existir no JSON, usa 24h como padrão
+                  // fallback, caso leia sensore antes de ele estar cadastrado
+                  // entra como padrão 1, para ler 24h
+                  s.dia_modo[i]        = modos[i]   | DIA_24H;
+                  s.dia_hora_inicio[i] = hInicio[i] | 0;
+                  s.dia_min_inicio[i]  = mInicio[i] | 0;
+                  s.dia_hora_fim[i]    = hFim[i]    | 0;
+                  s.dia_min_fim[i]     = mFim[i]    | 0;
+              }
+            
 
             s.mudo_ate = 0; // Reset do modo mudo ao reiniciar
             sensoresCadastrados.push_back(s);

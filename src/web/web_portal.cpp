@@ -37,17 +37,16 @@ const char WEB_STYLE[] PROGMEM = R"rawliteral(
 // Controla a interface da agenda no portal
 const char WEB_SCRIPT[] PROGMEM = R"rawliteral(
 <script>
-// Mostra ou esconde os selects de horário dependendo do radio escolhido
-function toggleHorario() {
-    var ativo = document.getElementById('r_horario').checked;
-    document.getElementById('div_horario').style.display = ativo ? 'block' : 'none';
-}
-// Marca os checkboxes dos dias de acordo com um bitmask
-// bit 0 = Domingo, bit 1 = Segunda, ..., bit 6 = Sábado
-// Exemplos: setDias(127) = todos, setDias(62) = dias úteis, setDias(65) = fim de semana
-function setDias(mask) {
-    for (var i = 0; i < 7; i++) {
-        document.getElementById('dia' + i).checked = (mask >> i) & 1;
+// Mostra ou esconde os selects de horário de um dia específico
+// Chamado quando o usuário clica num radio (Off / 24h / Hor)
+// i = índice do dia: 0=Dom, 1=Seg, 2=Ter, 3=Qua, 4=Qui, 5=Sex, 6=Sab
+function toggleDia(i) {
+    // Descobre qual radio está marcado para este dia
+    var sel = document.querySelector('input[name="dia_modo_' + i + '"]:checked');
+    var janela = document.getElementById('janela_' + i);
+    if (sel && janela) {
+        // Só exibe os campos de horário se o modo escolhido for 2 (DIA_HORARIO)
+        janela.style.display = (sel.value == '2') ? 'inline' : 'none';
     }
 }
 </script>
@@ -179,68 +178,79 @@ void handleEditarSensor() {
     }
     server.sendContent("</select> <small style='color:#888'>(duração padrão do botão Manutenção)</small></div>");
 
-    // ── Dias da semana (bitmask)
-    // Para cada dia, verifica se o bit correspondente está aceso no bitmask
+    // ── Agenda por dia ──
+    // Tabela com 7 linhas — uma por dia da semana
+    // Cada linha: nome do dia | radio(Off/24h/Hor) | campos de horário (só aparecem no modo Hor)
     const char* nomesDias[] = {"Dom","Seg","Ter","Qua","Qui","Sex","Sab"};
-    server.sendContent("<div class='campo'><b>Dias monitorados:</b><br><div class='dias' style='margin:8px 0'>");
+
+    server.sendContent("<div class='campo'><b>Agenda por dia:</b>");
+    server.sendContent("<table style='width:auto;margin-top:8px'>");
+    server.sendContent("<tr><th>Dia</th><th>Off</th><th>24h</th><th>Hor</th><th colspan='2'>Janela de horário</th></tr>");
+
     for (int i = 0; i < 7; i++) {
-        bool ativo = (s.dias_monitoramento >> i) & 1; // bit i aceso = dia ativo
-        server.sendContent("<label><input type='checkbox' id='dia" + String(i) +
-                           "' name='dia" + String(i) + "'" +
-                           String(ativo ? " checked" : "") + "> " +
-                           String(nomesDias[i]) + "</label>");
-    }
-    server.sendContent("</div>");
-    // Botões de atalho — usam JavaScript setDias(mask) para marcar os checkboxes
-    server.sendContent("<button type='button' class='atalho' onclick='setDias(127)'>Todos os dias</button>"); // 0b1111111
-    server.sendContent("<button type='button' class='atalho' onclick='setDias(62)'>Dias úteis</button>");    // 0b0111110
-    server.sendContent("<button type='button' class='atalho' onclick='setDias(65)'>Fim de semana</button>"); // 0b1000001
-    server.sendContent("</div>");
+        uint8_t modo = s.dia_modo[i]; // modo salvo para este dia
 
-    // ── Horário de monitoramento
-    // Radio: "24 horas" ou "Horário específico"
-    bool horarioAtivo = s.agenda_horario_ativo;
-    server.sendContent("<div class='campo'><b>Horário:</b><br style='margin:6px 0'>");
-    server.sendContent("<label><input type='radio' name='agenda_ativa' value='0' onclick='toggleHorario()'" +
-                       String(!horarioAtivo ? " checked" : "") + "> 24 horas</label>&nbsp;&nbsp;");
-    server.sendContent("<label><input type='radio' id='r_horario' name='agenda_ativa' value='1' onclick='toggleHorario()'" +
-                       String(horarioAtivo ? " checked" : "") + "> Horário específico</label>");
+        // Converte hora+minuto para minutos totais (para pré-selecionar os selects)
+        // Ex: 08:30 → 8*60+30 = 510
+        int minIni = s.dia_hora_inicio[i] * 60 + s.dia_min_inicio[i];
+        int minFim = s.dia_hora_fim[i]    * 60 + s.dia_min_fim[i];
 
-    // Div de horário — visível só se "Horário específico" estiver selecionado
-    server.sendContent("<div id='div_horario' class='horario-box' style='display:" +
-                       String(horarioAtivo ? "block" : "none") + "'>");
-    server.sendContent("Das ");
+        // A janela de horário só é exibida se o modo atual for DIA_HORARIO (2)
+        String visJanela = (modo == DIA_HORARIO) ? "inline" : "none";
 
-    // Select de hora início — valor enviado em minutos desde 00:00 (ex: 08:30 = 510)
-    // Isso simplifica o recebimento no servidor: um único número em vez de hora+minuto separados
-    int minInicioAtual = s.hora_inicio * 60 + s.min_inicio;
-    server.sendContent("<select name='inicio'>");
-    for (int h = 0; h < 24; h++) {
-        for (int m = 0; m <= 30; m += 30) {
-            int val = h * 60 + m;
-            char buf[8];
-            snprintf(buf, sizeof(buf), "%02d:%02d", h, m);
-            server.sendContent("<option value='" + String(val) + "'" +
-                               (val == minInicioAtual ? " selected" : "") + ">" + buf + "</option>");
+        server.sendContent("<tr>");
+        server.sendContent("<td><b>" + String(nomesDias[i]) + "</b></td>");
+
+        // Radio Off (valor 0 = DIA_DESLIGADO)
+        server.sendContent("<td style='text-align:center'><input type='radio' name='dia_modo_" + String(i) +
+                           "' value='0'" + String(modo == DIA_DESLIGADO ? " checked" : "") +
+                           " onclick='toggleDia(" + String(i) + ")'></td>");
+
+        // Radio 24h (valor 1 = DIA_24H)
+        server.sendContent("<td style='text-align:center'><input type='radio' name='dia_modo_" + String(i) +
+                           "' value='1'" + String(modo == DIA_24H ? " checked" : "") +
+                           " onclick='toggleDia(" + String(i) + ")'></td>");
+
+        // Radio Hor (valor 2 = DIA_HORARIO)
+        server.sendContent("<td style='text-align:center'><input type='radio' name='dia_modo_" + String(i) +
+                           "' value='2'" + String(modo == DIA_HORARIO ? " checked" : "") +
+                           " onclick='toggleDia(" + String(i) + ")'></td>");
+
+        // Célula com os selects de horário — span controlado pelo JavaScript toggleDia()
+        server.sendContent("<td colspan='2'><span id='janela_" + String(i) +
+                           "' style='display:" + visJanela + "'>");
+
+        // Select de início — envia minutos desde 00:00 (ex: 510 = 08:30)
+        server.sendContent("Das <select name='dia_ini_" + String(i) + "'>");
+        for (int h = 0; h < 24; h++) {
+            for (int m = 0; m <= 30; m += 30) {
+                int val = h * 60 + m;
+                char buf[6];
+                snprintf(buf, sizeof(buf), "%02d:%02d", h, m);
+                server.sendContent("<option value='" + String(val) + "'" +
+                                   (val == minIni ? " selected" : "") + ">" + buf + "</option>");
+            }
         }
-    }
-    server.sendContent("</select> às ");
+        server.sendContent("</select>");
 
-    // Select de hora fim
-    int minFimAtual = s.hora_fim * 60 + s.min_fim;
-    server.sendContent("<select name='fim'>");
-    for (int h = 0; h < 24; h++) {
-        for (int m = 0; m <= 30; m += 30) {
-            int val = h * 60 + m;
-            char buf[8];
-            snprintf(buf, sizeof(buf), "%02d:%02d", h, m);
-            server.sendContent("<option value='" + String(val) + "'" +
-                               (val == minFimAtual ? " selected" : "") + ">" + buf + "</option>");
+        // Select de fim
+        server.sendContent(" &agrave;s <select name='dia_fim_" + String(i) + "'>");
+        for (int h = 0; h < 24; h++) {
+            for (int m = 0; m <= 30; m += 30) {
+                int val = h * 60 + m;
+                char buf[6];
+                snprintf(buf, sizeof(buf), "%02d:%02d", h, m);
+                server.sendContent("<option value='" + String(val) + "'" +
+                                   (val == minFim ? " selected" : "") + ">" + buf + "</option>");
+            }
         }
+        server.sendContent("</select></span></td>");
+        server.sendContent("</tr>");
     }
-    server.sendContent("</select>");
-    server.sendContent("<br><small style='color:#888'>Se o fim for menor que o início, o monitoramento atravessa a meia-noite.</small>");
-    server.sendContent("</div></div>"); // fecha div_horario e campo
+
+    server.sendContent("</table>");
+    server.sendContent("<small style='color:#888'>Hor = horário específico. Se fim &lt; início, atravessa a meia-noite.</small>");
+    server.sendContent("</div>"); // fecha campo
 
     // Botões salvar / cancelar
     server.sendContent("<div class='campo'><input type='submit' value='Salvar' class='btn btn-primary'> ");
@@ -287,29 +297,32 @@ void handleSalvarEdicao() {
     if (server.hasArg("espera"))     s.tempo_espera_min  = (uint16_t)server.arg("espera").toInt();
     if (server.hasArg("horas_mudo")) s.horas_mudo_padrao = (uint8_t)server.arg("horas_mudo").toInt();
 
-    // ── Bitmask dos dias
-    // Checkboxes HTML só enviam o campo se estiverem marcados — ausência = desmarcado
-    uint8_t dias = 0;
+    // ── Agenda por dia ──
+    // Para cada dia lê o radio (modo) e os selects de horário (se modo = DIA_HORARIO)
     for (int i = 0; i < 7; i++) {
-        if (server.hasArg("dia" + String(i))) {
-            dias |= (1 << i); // liga o bit desse dia no bitmask
+        String modoKey = "dia_modo_" + String(i); // ex: "dia_modo_3" = Quarta
+        String iniKey  = "dia_ini_"  + String(i); // ex: "dia_ini_3"
+        String fimKey  = "dia_fim_"  + String(i); // ex: "dia_fim_3"
+
+        if (server.hasArg(modoKey)) {
+            s.dia_modo[i] = (uint8_t)server.arg(modoKey).toInt();
         }
-    }
-    s.dias_monitoramento = dias;
 
-    // ── Horário
-    // agenda_ativa == "1" = "Horário específico" foi selecionado
-    s.agenda_horario_ativo = server.hasArg("agenda_ativa") && server.arg("agenda_ativa") == "1";
-
-    if (s.agenda_horario_ativo) {
-        // Os selects enviam minutos desde 00:00 (ex: 510 = 08:30)
-        // Convertemos de volta para hora e minuto separados
-        int minInicio = server.arg("inicio").toInt();
-        int minFim    = server.arg("fim").toInt();
-        s.hora_inicio = minInicio / 60; // divisão inteira: 510 / 60 = 8
-        s.min_inicio  = minInicio % 60; // resto:           510 % 60 = 30
-        s.hora_fim    = minFim / 60;
-        s.min_fim     = minFim % 60;
+        // Só salva horário se o modo deste dia for DIA_HORARIO (2)
+        // Os selects enviam minutos desde 00:00 — convertemos de volta para hora+minuto
+        // Ex: 510 minutos → hora = 510/60 = 8, minuto = 510%60 = 30 → 08:30
+        if (s.dia_modo[i] == DIA_HORARIO) {
+            if (server.hasArg(iniKey)) {
+                int minIni = server.arg(iniKey).toInt();
+                s.dia_hora_inicio[i] = minIni / 60; // divisão inteira: 510/60 = 8
+                s.dia_min_inicio[i]  = minIni % 60; // resto:           510%60 = 30
+            }
+            if (server.hasArg(fimKey)) {
+                int minFim = server.arg(fimKey).toInt();
+                s.dia_hora_fim[i] = minFim / 60;
+                s.dia_min_fim[i]  = minFim % 60;
+            }
+        }
     }
 
     registry_salvar(s);
@@ -362,12 +375,15 @@ void handleConfigSensor() {
         s.temp_critica         = s.temp_max_alerta + 5.0; // 5°C acima do alerta
         s.tempo_espera_min     = 0;                        // avisa imediatamente
         s.horas_mudo_padrao    = 1;                        // botão manutenção = 1h
-        s.dias_monitoramento   = 127;                      // todos os dias (0b1111111)
-        s.agenda_horario_ativo = false;                    // 24h por padrão
-        s.hora_inicio          = 0;
-        s.min_inicio           = 0;
-        s.hora_fim             = 0;
-        s.min_fim              = 0;
+        // ── Agenda por dia: padrão = todos os dias em 24h ──
+        // O usuário pode ajustar depois na página de edição
+        for (int i = 0; i < 7; i++) {
+            s.dia_modo[i]        = DIA_24H; // começa monitorando 24h
+            s.dia_hora_inicio[i] = 0;       // zerado — não usado no modo 24h
+            s.dia_min_inicio[i]  = 0;
+            s.dia_hora_fim[i]    = 0;       // zerado — não usado no modo 24h
+            s.dia_min_fim[i]     = 0;
+        }
         s.mudo_ate             = 0; // não está em manutenção
 
         registry_salvar(s);

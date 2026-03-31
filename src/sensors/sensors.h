@@ -13,10 +13,13 @@
 
 // ================= ESTATÍSTICAS DOS SENSORES =================
 struct SensorStats{
-    uint32_t leituras_ok;      //Sucessos
-    uint32_t leituras_erro;    //Falhas
-    float ultima_temp;         //última temperatura válida
-    bool ultimo_erro;          // se a última temperatua falhou
+    uint32_t leituras_ok;       //Sucessos
+    uint32_t leituras_erro;     //Falhas
+    float ultima_temp;          //última temperatura válida
+    bool ultimo_erro;           // se a última temperatua falhou
+    time_t ultimo_timestamp;    // hora da última leitura bem-sucedida (0 = nunca leu)
+                                // time_t numero inteiro, guarda segundos desde 01/01/1970
+                                // função time(nullptr) - retorna hora atual do NTP
 };
 
 // ================= FUNÇÕES DE HARDWARE (O que mexe no fio) =================

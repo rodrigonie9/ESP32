@@ -64,7 +64,7 @@ void hw_iniciar(){
 
   //Limpa estatísticas usando o limite centralizado
   for (uint8_t i = 0; i < MAX_SENSORES; i++) {
-    stats[i] = {0, 0, SENSOR_ERRO, false};
+    stats[i] = {0, 0, SENSOR_ERRO, false,0};    //ultimo 0 = timpestamp zerado(nunca leu)
     ultimaTemperatura[i] = SENSOR_ERRO;
   }
 
@@ -103,6 +103,7 @@ void hw_lerTodos(){
       stats[i].ultimo_erro = false;
       stats[i].ultima_temp = temp;
       ultimaTemperatura[i] = temp;
+      stats[i].ultimo_timestamp = time(nullptr);      //grava a hora atual
     }
   }
 }
