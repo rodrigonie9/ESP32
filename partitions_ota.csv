@@ -1,6 +1,13 @@
 # Name,   Type, SubType, Offset,  Size
+#
+# Partições otimizadas — spiffs removido (nunca foi usado)
+# O espaço foi redistribuído para app0 e app1
+#
+# app0 e app1: 1.25MB → 1.875MB cada
+# Uso da flash cai de ~85% para ~57%
+# NVS e otadata inalterados
+# NVS 20kb - suficiente para os 30 sensores
 nvs,      data, nvs,     0x9000,  0x5000
 otadata,  data, ota,     0xe000,  0x2000
-app0,     app,  ota_0,   0x10000, 0x140000
-app1,     app,  ota_1,   0x150000,0x140000
-spiffs,   data, spiffs,  0x290000,0x170000
+app0,     app,  ota_0,   0x10000, 0x1E0000
+app1,     app,  ota_1,   0x1F0000,0x1E0000
