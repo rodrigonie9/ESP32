@@ -180,12 +180,26 @@ void loop() {
 
   if (solicitarOTA) {
     LOG("Iniciando atualização OTA...");
-    enviarMensagemTelegram("Atualização de OTA iniciando agora");
-    delay(500); //tempo enviar msg, liberar sockets https, estabiizar wifi
-    atualizarFirmwareOTA(URL_FIRMWARE);
+    char bufInicio[80];
+    snprintf(bufInicio, sizeof(bufInicio), "[%s] OTA iniciando agora...", getNomePlaca().c_str());
+    enviarMensagemTelegram(bufInicio);
+    delay(500); // tempo para enviar msg, liberar sockets, estabilizar wifi
+
+    bool otaOk = atualizarFirmwareOTA(URL_FIRMWARE);
+    // Se OTA bem-sucedido → ESP32 reinicia dentro da função (nunca chega aqui)
+    // Se chegou aqui → OTA falhou, firmware atual continua rodando
+
+    if (!otaOk) {
+      // Avisa no Telegram que falhou — sem isso o usuário fica no escuro
+      char bufFalha[128];
+      snprintf(bufFalha, sizeof(bufFalha),
+               "[%s] OTA FALHOU. Firmware atual continua rodando.\n"
+               "Verifique se o arquivo .bin foi enviado ao GitHub.",
+               getNomePlaca().c_str());
+      enviarMensagemTelegram(bufFalha);
+      LOG("OTA falhou.");
+    }
     solicitarOTA = false;
-    // Se OTA iniciar com sucesso, a ESP32 reinicia
-    // Se falhar, continua rodando firmware atual
   }
 
   // ===================== LEITURA TEMPERATURA ======================
@@ -208,6 +222,20 @@ void loop() {
 
     //buffer fixo com snprinft, escreve direto no buffer, sem string na memória
     snprintf(mensagem, sizeof(mensagem), "Relatorio de Rotina\nPlaca: %s\n\n", getNomePlaca().c_str());
+
+    // Pega a hora atual da placa
+    // struct tm é uma "ficha" com campos separados: hora, minuto, dia, mês, ano...
+    // getLocalTime() preenche essa ficha com a hora do NTP
+    // Se NTP não sincronizou ainda, a função retorna false e pulamos a hora
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      char horaAtual[32];
+      // strftime formata a ficha tm em texto legível
+      // %H = hora (00-23), %M = minuto, %d = dia, %m = mês, %Y = ano com 4 dígitos
+      strftime(horaAtual, sizeof(horaAtual), "Hora: %H:%M de %d/%m/%Y\n\n", &timeinfo);
+      // strncat cola horaAtual no final de mensagem, respeitando o limite do buffer
+      strncat(mensagem, horaAtual, sizeof(mensagem) - strlen(mensagem) - 1);
+    }
 
     uint8_t totalSensoresNoFio = hw_getContagem();
 

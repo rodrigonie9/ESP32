@@ -40,6 +40,11 @@ bool atualizarFirmwareOTA(const char* urlFirmware) {
   http.setTimeout(20000);
   // Define timeout de 20 segundos para download
 
+  // Segue redirecionamentos automaticamente
+  // GitHub Releases responde com HTTP 302 (redirecionamento para CDN)
+  // Sem essa linha, o HTTPClient vê o 302 e desiste — OTA falha silenciosamente
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
   http.begin(urlFirmware);
   // Inicia a conexão com a URL do firmware (.bin)
 
@@ -47,7 +52,9 @@ bool atualizarFirmwareOTA(const char* urlFirmware) {
   // Faz a requisição HTTP
 
   if (httpCode != HTTP_CODE_OK) {
-    // Se o servidor não respondeu corretamente
+    // Loga o código HTTP recebido — ajuda a entender o que falhou
+    // 302 = redirecionamento não seguido | 404 = arquivo não encontrado | -1 = sem conexão
+    Serial.printf("[OTA] Falha HTTP: código %d\n", httpCode);
     http.end();
     return false;
   }

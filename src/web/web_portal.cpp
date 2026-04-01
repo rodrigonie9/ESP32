@@ -96,9 +96,23 @@ void handleRoot() {
     server.sendContent(WEB_STYLE);
     server.sendContent("</head><body>");
 
-    // --- CABEÇALHO com gradiente — mostra o nome da placa em destaque ---
+    // --- CABEÇALHO com gradiente — mostra o nome da placa e hora atual em destaque ---
+
+    // Tenta pegar a hora atual do NTP
+    // struct tm é uma "ficha" com campos: hora, minuto, dia, mês, ano
+    // getLocalTime() preenche essa ficha — retorna false se NTP ainda não sincronizou
+    char horaAtual[24] = "hora nao sincronizada";
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+        // strftime formata a ficha tm em texto:
+        // %H:%M:%S = 14:32:05  |  %d/%m/%Y = 31/03/2026
+        strftime(horaAtual, sizeof(horaAtual), "%H:%M:%S  %d/%m/%Y", &timeinfo);
+    }
+
     server.sendContent("<div class='topo'><h1>" + getNomePlaca() + "</h1>"
-                       "<small>Monitor de Temperatura &bull; ESP32</small></div>");
+                       "<small>Monitor de Temperatura &bull; ESP32</small>"
+                       "<small style='display:block;margin-top:6px;opacity:0.85'>"
+                       "Hora da placa: " + String(horaAtual) + "</small></div>");
 
     // --- SEÇÃO 1: CONFIGURAÇÃO DO NOME DA PLACA ---
     String cardPlaca = "<div class='card'><h2>Configuração da Placa</h2>";

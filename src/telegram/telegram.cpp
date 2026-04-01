@@ -7,6 +7,7 @@ static Preferences prefsTelegram;   // objeto responsável acessar NVS (flash in
 
 #include "telegram.h"        // Header do Telegram
 #include "wifi_config/wifi_config.h"
+#include "device/device_config.h"  // para usar getNomePlaca() nas mensagens OTA
 #include "debug.h"
 #include "secrets.h"
 
@@ -117,7 +118,10 @@ if (!pedidoOTA &&
       payload.indexOf("/update") != -1) {
 
   pedidoOTA = true;
-  enviarMensagemTelegram("Comando /update recebido. Iniciando OTA...");
+  // snprintf monta a mensagem num buffer fixo — seguro para RAM da ESP32
+  char buf[80];
+  snprintf(buf, sizeof(buf), "[%s] Comando /update recebido. Aguardando...", getNomePlaca().c_str());
+  enviarMensagemTelegram(buf);
 }
 
   // procura último "update_id" para o número
