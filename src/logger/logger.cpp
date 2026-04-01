@@ -1,9 +1,9 @@
-// O #ifdef garante que todo este arquivo só é compilado                                                                                         
-  // se LOGGER_ATIVO estiver definido no logger.h                                                                                                  
-  // Se desativar o log, este arquivo inteiro é ignorado pelo compilador
-  #ifdef LOGGER_ATIVO
+// logger.h DEVE vir primeiro — ele define LOGGER_ATIVO
+// Só depois o #ifdef consegue verificar se está ativo
+#include "logger.h"
 
-  #include "logger.h"
+// Todo o resto só é compilado se LOGGER_ATIVO estiver definido no logger.h
+#ifdef LOGGER_ATIVO
   #include "../sensors/sensors.h"
   #include "../sensors/sensor_registry.h"
   #include "../logic/alert_manager.h"
