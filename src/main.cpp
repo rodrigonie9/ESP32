@@ -15,6 +15,7 @@
 #include "sensors/sensors.h"
 #include "sensors/sensor_registry.h"
 #include "logic/alert_manager.h"
+#include "logger/logger.h"
 
 #include <ESPmDNS.h>              // identidade do dispositivo placa
 
@@ -143,6 +144,8 @@ void setup() {
   iniciarWebPortal();
   LOG("Servido Web iniciado");
 
+  logger_iniciar();
+
 
   // ====================== INFO FINAL ======================
   LOG("IP local:");
@@ -215,6 +218,9 @@ void loop() {
 
     //Procesa lógica de alertas
     processarLogicaAlertas();
+
+    // Envia leitura de todos os sensores ao Google Sheets
+    logger_registrarLeitura();
 
     // Monta a mensagem
     char mensagem[TAMANHO_MSG]; //array de char tamanho fixo, memória liberada após sair do bloco
