@@ -12,24 +12,54 @@
 WebServer server(80);
 
 // CSS salvo na flash (PROGMEM) para economizar RAM
+// Layout moderno com gradiente no cabeçalho, cards com sombra suave,
+// tabela clean e ID compacto que expande ao passar o mouse
 const char WEB_STYLE[] PROGMEM = R"rawliteral(
 <style>
-    body{font-family:sans-serif;margin:20px;background:#f4f4f9;color:#333;}
-    .card{background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin-bottom:20px;}
-    h1,h2{color:#444;}
-    table{width:100%;border-collapse:collapse;margin-top:10px;}
-    th,td{border:1px solid #ddd;padding:12px;text-align:left;}
-    th{background:#f8f8f8;}
-    .btn{padding:8px 15px;border:none;border-radius:4px;cursor:pointer;text-decoration:none;display:inline-block;margin:2px;}
-    .btn-primary{background:#007bff;color:#fff;}
-    .btn-danger{background:#dc3545;color:#fff;}
-    .btn-warning{background:#ffc107;color:#333;}
-    .btn-sm{padding:4px 10px;font-size:0.85em;}
-    input[type=text],input[type=number],select{padding:8px;border:1px solid #ccc;border-radius:4px;}
-    .campo{margin:12px 0;}
-    .dias label{margin-right:12px;cursor:pointer;}
-    .atalho{padding:4px 12px;margin-right:4px;background:#e9ecef;border:1px solid #ccc;border-radius:4px;cursor:pointer;}
-    .horario-box{background:#f0f4ff;padding:12px;border-radius:4px;margin-top:8px;border:1px solid #c8d8f8;}
+body{font-family:'Segoe UI',Arial,sans-serif;margin:0;padding:16px;background:#eef2f7;color:#2d3748;}
+
+/* ── Cabeçalho com gradiente azul → verde ── */
+.topo{background:linear-gradient(135deg,#1a56db 0%,#0e9f6e 100%);color:#fff;padding:18px 24px;border-radius:12px;margin-bottom:18px;box-shadow:0 4px 16px rgba(26,86,219,0.25);}
+.topo h1{margin:0 0 4px 0;font-size:1.4em;}
+.topo small{opacity:0.85;font-size:0.85em;}
+
+/* ── Cards brancos com sombra suave ── */
+.card{background:#fff;padding:20px 22px;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.07),0 4px 12px rgba(0,0,0,0.05);margin-bottom:18px;}
+h2{color:#1a56db;font-size:0.78em;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 14px 0;padding-bottom:8px;border-bottom:2px solid #e5e7eb;}
+
+/* ── Tabela clean sem bordas grossas ── */
+table{width:100%;border-collapse:collapse;}
+th{background:#f7f9fc;color:#6b7280;font-size:0.72em;text-transform:uppercase;letter-spacing:0.06em;padding:10px 12px;text-align:left;border-bottom:2px solid #e5e7eb;}
+td{padding:11px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle;font-size:0.9em;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#f9fafb;}
+
+/* ── Cores de temperatura por status ── */
+.tok{color:#059669;font-weight:700;}    /* verde  = normal      */
+.twarn{color:#d97706;font-weight:700;}  /* laranja = alerta     */
+.tcrit{color:#dc2626;font-weight:700;}  /* vermelho = crítico   */
+
+/* ── Badge de manutenção ── */
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.75em;font-weight:600;}
+.bmaint{background:#fef3c7;color:#92400e;}
+
+/* ── Botões ── */
+.btn{padding:5px 11px;border:none;border-radius:6px;cursor:pointer;text-decoration:none;display:inline-block;margin:2px;font-size:0.8em;font-weight:500;}
+.btn:hover{opacity:0.85;}
+.btn-primary{background:#1a56db;color:#fff;}
+.btn-danger{background:#ef4444;color:#fff;}
+.btn-warning{background:#f59e0b;color:#fff;}
+
+/* ── ID compacto: pequeno por padrão, expande ao passar o mouse ──
+   max-width pequeno faz o texto ser cortado com "..."
+   ao passar o mouse, max-width aumenta suavemente (transition) */
+.id-chip{display:inline-block;max-width:52px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-family:monospace;font-size:0.75em;background:#f3f4f6;padding:2px 6px;border-radius:4px;cursor:default;transition:max-width 0.35s ease;vertical-align:middle;}
+.id-chip:hover{max-width:240px;}
+
+/* ── Formulários ── */
+input[type=text],input[type=number],select{padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.9em;}
+.campo{margin:14px 0;}
+.horario-box{background:#f0f4ff;padding:12px;border-radius:6px;margin-top:8px;border:1px solid #c8d8f8;}
 </style>
 )rawliteral";
 
@@ -59,63 +89,106 @@ function toggleDia(i) {
 void handleRoot() {
     // Avisa o navegador que vamos enviar o site em partes (chunks)
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    // refresh automático a cada 2 minutos
+    // refresh automático a cada 2 minutos | viewport para funcionar bem no celular
     server.send(200, "text/html", "<!DOCTYPE html><html><head><meta charset='utf-8'>"
-                                  "<meta http-equiv='refresh' content='120'>");
+                                  "<meta http-equiv='refresh' content='120'>"
+                                  "<meta name='viewport' content='width=device-width,initial-scale=1'>");
     server.sendContent(WEB_STYLE);
-    server.sendContent("</head><body><h1>Monitor de Temperatura</h1>");
+    server.sendContent("</head><body>");
 
-    // --- SEÇÃO 1: NOME DA PLACA ---
+    // --- CABEÇALHO com gradiente — mostra o nome da placa em destaque ---
+    server.sendContent("<div class='topo'><h1>" + getNomePlaca() + "</h1>"
+                       "<small>Monitor de Temperatura &bull; ESP32</small></div>");
+
+    // --- SEÇÃO 1: CONFIGURAÇÃO DO NOME DA PLACA ---
     String cardPlaca = "<div class='card'><h2>Configuração da Placa</h2>";
     cardPlaca += "<form action='/config/placa' method='POST'>";
     cardPlaca += "Nome: <input type='text' name='nome' value='" + getNomePlaca() + "' maxlength='32' required> ";
     cardPlaca += "<input type='submit' value='Salvar' class='btn btn-primary'></form></div>";
     server.sendContent(cardPlaca);
 
-    // --- SEÇÃO 2: SENSORES CADASTRADOS ---
+    // --- SEÇÃO 2: TABELA DE SENSORES CADASTRADOS ---
+    // Ordem das colunas: Nome | Temperatura | Hora Leitura | Alerta | Ações | ID
     server.sendContent("<div class='card'><h2>Sensores Cadastrados</h2><table>");
-    server.sendContent("<tr><th>Nome</th><th>ID</th><th>Alerta</th><th>Temp</th><th>Ações</th></tr>");
+    server.sendContent("<tr><th>Nome</th><th>Temperatura</th><th>Hora Leitura</th><th>Alerta</th><th>Ações</th><th>ID</th></tr>");
 
     auto cadastrados = registry_getTodos();
     for (const auto& s : cadastrados) {
-        float temp = hw_getTemp(s.id_fisico);
+        float temp     = hw_getTemp(s.id_fisico);
+        SensorStats st = hw_getStats(s.id_fisico); // contém ultimo_timestamp
 
-        // Verifica se está em manutenção ativa
-        // (long)(millis() - mudo_ate) < 0 significa que o tempo ainda não acabou
-        String statusMudo = "";
+        // ── Coluna NOME + badge de manutenção ──
+        // O badge laranja aparece só enquanto o modo manutenção está ativo
+        String nomeCell = s.nome_amigavel;
         if (s.mudo_ate > 0 && (long)(millis() - s.mudo_ate) < 0) {
-            statusMudo = " <span style='color:orange'>[Manutenção]</span>";
+            // (long)(millis() - mudo_ate) < 0 → o tempo ainda não passou
+            nomeCell += " <span class='badge bmaint'>Manutenção</span>";
         }
 
-        // Envia cada célula separadamente — evita String grande na RAM
-        server.sendContent("<tr><td>" + s.nome_amigavel + statusMudo + "</td>");
-        server.sendContent("<td><code>" + s.id_fisico + "</code></td>");
-        server.sendContent("<td>" + String(s.temp_max_alerta, 1) + "°C</td>");
-        String tempStr = (temp == SENSOR_ERRO)
-            ? "<span style='color:red'>OFF</span>"
-            : String(temp, 1) + "°C";
-        server.sendContent("<td>" + tempStr + "</td>");
+        // ── Coluna TEMPERATURA com cor por status ──
+        // Verde = normal | Laranja = acima do alerta | Vermelho = crítico ou sensor OFF
+        String tempCell;
+        if (temp == SENSOR_ERRO) {
+            tempCell = "<span class='tcrit'>OFF</span>";
+        } else if (temp >= s.temp_critica) {
+            // Temperatura acima do limite crítico — aviso imediato
+            tempCell = "<span class='tcrit'>" + String(temp, 1) + "&deg;C</span>";
+        } else if (temp >= s.temp_max_alerta) {
+            // Temperatura acima do alerta normal
+            tempCell = "<span class='twarn'>" + String(temp, 1) + "&deg;C</span>";
+        } else {
+            // Temperatura normal
+            tempCell = "<span class='tok'>" + String(temp, 1) + "&deg;C</span>";
+        }
 
-        // Coluna de ações: Editar + Manutenção + Remover
+        // ── Coluna HORA DA ÚLTIMA LEITURA ──
+        // st.ultimo_timestamp == 0 → nunca leu (NTP não sincronizou ainda ou placa acabou de ligar)
+        // localtime() converte o timestamp (segundos desde 1970) para hora/data legível
+        // strftime() formata como "HH:MM:SS"
+        String horaCell;
+        if (st.ultimo_timestamp == 0) {
+            horaCell = "<span style='color:#9ca3af'>&mdash;</span>"; // traço cinza
+        } else {
+            struct tm* tm_info = localtime(&st.ultimo_timestamp);
+            char buf[9]; // "HH:MM:SS\0" = 9 caracteres
+            strftime(buf, sizeof(buf), "%H:%M:%S", tm_info);
+            horaCell = String(buf);
+        }
+
+        // ── Envia as células na nova ordem ──
+        server.sendContent("<tr>");
+        server.sendContent("<td>" + nomeCell + "</td>");
+        server.sendContent("<td>" + tempCell + "</td>");
+        server.sendContent("<td>" + horaCell + "</td>");
+        server.sendContent("<td>" + String(s.temp_max_alerta, 1) + "&deg;C</td>");
+
+        // ── Coluna AÇÕES: Editar + Manutenção + Remover ──
         server.sendContent("<td>");
-        server.sendContent("<a href='/editar?id=" + s.id_fisico + "' class='btn btn-primary btn-sm'>Editar</a> ");
+        server.sendContent("<a href='/editar?id=" + s.id_fisico + "' class='btn btn-primary'>Editar</a> ");
 
-        // Formulário inline de manutenção — seleciona duração e envia para /manutencao
+        // Formulário de manutenção: select de horas + botão — tudo numa linha (display:inline)
         server.sendContent("<form action='/manutencao' method='POST' style='display:inline'>");
         server.sendContent("<input type='hidden' name='id' value='" + s.id_fisico + "'>");
-        server.sendContent("<select name='horas' style='padding:3px'>");
+        server.sendContent("<select name='horas' style='padding:3px;font-size:0.8em'>");
         for (int h = 1; h <= 24; h++) {
             server.sendContent("<option value='" + String(h) + "'>" + String(h) + "h</option>");
         }
         server.sendContent("</select> ");
-        server.sendContent("<button type='submit' class='btn btn-warning btn-sm'>Manutenção</button></form> ");
+        server.sendContent("<button type='submit' class='btn btn-warning'>Manutenção</button></form> ");
+        server.sendContent("<a href='/remover?id=" + s.id_fisico + "' class='btn btn-danger'>Remover</a>");
+        server.sendContent("</td>");
 
-        server.sendContent("<a href='/remover?id=" + s.id_fisico + "' class='btn btn-danger btn-sm'>Remover</a>");
-        server.sendContent("</td></tr>");
+        // ── Coluna ID — pequeno com hover para expandir ──
+        // .id-chip → max-width curto, texto cortado com "..."
+        // .id-chip:hover → max-width aumenta suavemente (CSS transition)
+        // title='' → tooltip nativo do navegador com o ID completo
+        server.sendContent("<td><span class='id-chip' title='" + s.id_fisico + "'>"
+                           + s.id_fisico + "</span></td>");
+        server.sendContent("</tr>");
     }
     server.sendContent("</table></div>");
 
-    // --- SEÇÃO 3: SENSORES NOVOS (DETECTADOS NO FIO) ---
+    // --- SEÇÃO 3: SENSORES DETECTADOS NO FIO MAS AINDA NÃO CADASTRADOS ---
     server.sendContent("<div class='card'><h2>Detectados no Barramento</h2><table>");
     server.sendContent("<tr><th>ID Físico</th><th>Ação</th></tr>");
 
@@ -128,13 +201,13 @@ void handleRoot() {
             server.sendContent("<form action='/config/sensor' method='POST' style='display:inline'>");
             server.sendContent("<input type='hidden' name='id' value='" + id + "'>");
             server.sendContent("<input type='text' name='nome' placeholder='Nome' maxlength='32' required> ");
-            server.sendContent("<input type='number' step='0.1' name='max' value='8.0' min='-50' max='100' style='width:70px' required> °C ");
+            server.sendContent("<input type='number' step='0.1' name='max' value='8.0' min='-50' max='100' style='width:70px' required> &deg;C ");
             server.sendContent("<input type='submit' value='Cadastrar' class='btn btn-primary'></form>");
             server.sendContent("</td></tr>");
         }
     }
     server.sendContent("</table></div></body></html>");
-    server.sendContent(""); // finaliza o envio em chunks
+    server.sendContent(""); // sinaliza fim do envio em chunks
 }
 
 
@@ -155,7 +228,8 @@ void handleEditarSensor() {
     }
 
     server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-    server.send(200, "text/html", "<!DOCTYPE html><html><head><meta charset='utf-8'>");
+    server.send(200, "text/html", "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+                                  "<meta name='viewport' content='width=device-width,initial-scale=1'>");
     server.sendContent(WEB_STYLE);
     server.sendContent(WEB_SCRIPT);
     server.sendContent("</head><body><h1>Editar Sensor</h1><div class='card'>");

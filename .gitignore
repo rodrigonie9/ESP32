@@ -5,5 +5,10 @@
 .vscode/launch.json
 .vscode/ipch
 .vscode/
+
 #arquivo de segredos
 include/secrets.h
+
+#firmware compilado - distribuido via GitHug Releass, não pelo código-fonte
+firmware/firmware.bin   
+

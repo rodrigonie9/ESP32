@@ -50,7 +50,7 @@
 
 // URL do firmware no GitHub
 const char* URL_FIRMWARE =
-"https://raw.githubusercontent.com/rodrigonie9/ESP32/main/firmware/firmware.bin";
+"https://github.com/rodrigonie9/ESP32/releases/download/v1.0/firmware.bin";
 
 // Flag que indica pedido de atualização
 // volatile (sempre buscar real valor da memória), sem otimizar
