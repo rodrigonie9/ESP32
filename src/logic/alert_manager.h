@@ -11,4 +11,5 @@ void alert_setModoManutencao(const String& id_fisico, uint8_t horas);
 // Verifica se o sensor está dentro do horário de monitoramento (agenda)
 // Retorna true = pode monitorar | false = fora da agenda
 // Exposta aqui para uso no logger — lógica fica centralizada no alert_manager
+//
 bool estaNoHorarioDeMonitoramento(const SensorConfig& s);
