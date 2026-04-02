@@ -16,8 +16,8 @@ static Preferences prefsTelegram;   // objeto responsável acessar NVS (flash in
 // Lista de Chat IDs
 const char* chatIDs[] = {
   "913490344",     // Rodrigo
-  // "8215871074",    // Gilberto
-  // "5713591355"     // Andrigo
+  "8215871074",    // Gilberto
+  "5713591355"     // Andrigo
 };
 
 // Quantidade total de chats cadastrados

@@ -66,10 +66,6 @@ bool horaEstaSincronizada = false;
 unsigned long ultimoEnvio = 0;              // Guarda o tempo do último envio
 const unsigned long INTERVALO = 120000;      //  
 
-unsigned long ultimoRelatorio = 0;
-unsigned long ultimaLeitura = 0;
-
-#define TAMANHO_MSG 512 //tamanho buffer
 
 
 void setup() {
@@ -221,49 +217,7 @@ void loop() {
 
     // Envia leitura de todos os sensores ao Google Sheets
     logger_registrarLeitura();
-
-    // Monta a mensagem
-    char mensagem[TAMANHO_MSG]; //array de char tamanho fixo, memória liberada após sair do bloco
-    char linha[64];
-
-    //buffer fixo com snprinft, escreve direto no buffer, sem string na memória
-    snprintf(mensagem, sizeof(mensagem), "Relatorio de Rotina\nPlaca: %s\n\n", getNomePlaca().c_str());
-
-    // Pega a hora atual da placa
-    // struct tm é uma "ficha" com campos separados: hora, minuto, dia, mês, ano...
-    // getLocalTime() preenche essa ficha com a hora do NTP
-    // Se NTP não sincronizou ainda, a função retorna false e pulamos a hora
-    struct tm timeinfo;
-    if (getLocalTime(&timeinfo)) {
-      char horaAtual[32];
-      // strftime formata a ficha tm em texto legível
-      // %H = hora (00-23), %M = minuto, %d = dia, %m = mês, %Y = ano com 4 dígitos
-      strftime(horaAtual, sizeof(horaAtual), "Hora: %H:%M de %d/%m/%Y\n\n", &timeinfo);
-      // strncat cola horaAtual no final de mensagem, respeitando o limite do buffer
-      strncat(mensagem, horaAtual, sizeof(mensagem) - strlen(mensagem) - 1);
-    }
-
-    uint8_t totalSensoresNoFio = hw_getContagem();
-
-    for (uint8_t i = 0; i < totalSensoresNoFio; i++) {
-
-      // & = "não copia, usa o texto original"
-      // const = "promete não modificar"
-      const String& id_fisico = hw_getID(i);
-      float temp = hw_getTemp(id_fisico);
-      const String& nome_amigavel = registry_getNome(id_fisico);
-
-      if (temp == SENSOR_ERRO) {
-          snprintf(linha, sizeof(linha), "- %s: ERRO\n", nome_amigavel.c_str());
-      } else {
-          snprintf(linha, sizeof(linha), "- %s: %.1f grC\n", nome_amigavel.c_str(), temp);
-      }
-      //strncat - concatena com segurança, respeitando limite do buffer
-      strncat(mensagem, linha, sizeof(mensagem) - strlen(mensagem) - 1);
-  }
-
-    // Envia para o Telegram
-    enviarMensagemTelegram(mensagem);
+    // Alertas via Telegram são enviados pelo alert_manager — não há relatório de rotina aqui
 
   }
 
@@ -274,7 +228,7 @@ void loop() {
   }
     
 
-  // Se hora não foi sincronizada no boor, tenta novamente
+  // Se hora não foi sincronizada no boot, tenta novamente
   if (!horaEstaSincronizada) {
     struct tm timeinfo;
     if (getLocalTime(&timeinfo)){

@@ -254,9 +254,18 @@ void handleEditarSensor() {
     server.sendContent("<div class='campo'>Nome: <input type='text' name='nome' value='" + s.nome_amigavel + "' maxlength='32' required></div>");
 
     // ── Temperaturas
-    server.sendContent("<div class='campo'>Temp. alerta: <input type='number' name='max' value='" + String(s.temp_max_alerta, 1) + "' step='0.1' min='-50' max='100' style='width:80px'> °C</div>");
-    server.sendContent("<div class='campo'>Temp. crítica: <input type='number' name='critica' value='" + String(s.temp_critica, 1) + "' step='0.1' min='-50' max='100' style='width:80px'> °C <small style='color:#888'>(aviso imediato)</small></div>");
-    server.sendContent("<div class='campo'>Tempo de espera: <input type='number' name='espera' value='" + String(s.tempo_espera_min) + "' min='0' max='999' style='width:70px'> min <small style='color:#888'>(0 = avisa imediatamente)</small></div>");
+    // ── Alerta suave: temperatura + tempo de degelo ──
+    // O "tempo de degelo" é a paciência do sistema antes de avisar
+    // Se a temperatura voltar ao normal dentro desse tempo, nenhum aviso é enviado
+    server.sendContent("<div class='campo'>Temp. alerta: <input type='number' name='max' value='" + String(s.temp_max_alerta, 1) + "' step='0.1' min='-50' max='100' style='width:80px'> °C"
+                       "&nbsp;&nbsp; Tempo de degelo: <input type='number' name='degelo' value='" + String(s.tempo_degelo_min) + "' min='0' max='999' style='width:60px'> min"
+                       " <small style='color:#888'>Aguarda este tempo acima do limite antes de avisar. Cobre ciclos de degelo normais.</small></div>");
+
+    // ── Alerta crítico: temperatura + tempo de espera ──
+    // Tempo menor que o suave — crítico é mais urgente, mas ainda filtra picos passageiros
+    server.sendContent("<div class='campo'>Temp. crítica: <input type='number' name='critica' value='" + String(s.temp_critica, 1) + "' step='0.1' min='-50' max='100' style='width:80px'> °C"
+                       "&nbsp;&nbsp; Tempo de espera: <input type='number' name='espera_critico' value='" + String(s.tempo_espera_critico_min) + "' min='0' max='999' style='width:60px'> min"
+                       " <small style='color:#888'>Temperatura grave. Avisa após este tempo. Repete enquanto persistir.</small></div>");
 
     // ── Duração padrão do botão Manutenção
     server.sendContent("<div class='campo'>Silenciar por: <select name='horas_mudo'>");
@@ -381,9 +390,10 @@ void handleSalvarEdicao() {
     if (criticaStr.length() > 0 && (isdigit(criticaStr[0]) || criticaStr[0] == '-' || criticaStr[0] == '.'))
         s.temp_critica = criticaStr.toFloat();
 
-    // ── Tempo de espera e mudo padrão
-    if (server.hasArg("espera"))     s.tempo_espera_min  = (uint16_t)server.arg("espera").toInt();
-    if (server.hasArg("horas_mudo")) s.horas_mudo_padrao = (uint8_t)server.arg("horas_mudo").toInt();
+    // ── Tempos de alerta e mudo padrão
+    if (server.hasArg("degelo"))        s.tempo_degelo_min         = (uint16_t)server.arg("degelo").toInt();
+    if (server.hasArg("espera_critico")) s.tempo_espera_critico_min = (uint16_t)server.arg("espera_critico").toInt();
+    if (server.hasArg("horas_mudo"))    s.horas_mudo_padrao        = (uint8_t)server.arg("horas_mudo").toInt();
 
     // ── Agenda por dia ──
     // Para cada dia lê o radio (modo) e os selects de horário (se modo = DIA_HORARIO)
@@ -460,9 +470,10 @@ void handleConfigSensor() {
 
         // ── Valores padrão para o novo sensor
         // Podem ser ajustados depois na página de edição (botão Editar)
-        s.temp_critica         = s.temp_max_alerta + 5.0; // 5°C acima do alerta
-        s.tempo_espera_min     = 0;                        // avisa imediatamente
-        s.horas_mudo_padrao    = 1;                        // botão manutenção = 1h
+        s.temp_critica              = s.temp_max_alerta + 5.0; // 5°C acima do alerta
+        s.tempo_degelo_min          = 40;  // 40 min — cobre ciclos de degelo normais (~30 min + margem)
+        s.tempo_espera_critico_min  = 15;  // 15 min — crítico é urgente, paciência menor
+        s.horas_mudo_padrao         = 1;   // botão manutenção = 1h
         // ── Agenda por dia: padrão = todos os dias em 24h ──
         // O usuário pode ajustar depois na página de edição
         for (int i = 0; i < 7; i++) {

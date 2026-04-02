@@ -1,3 +1,106 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// ALERT MANAGER — LÓGICA DE ALERTAS COM DOIS TIMERS INDEPENDENTES
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// PROBLEMA QUE ESTE SISTEMA RESOLVE:
+//   Câmaras frigoríficas fazem ciclos de degelo automático (~30 min) onde a
+//   temperatura sobe bastante. Sem filtro, isso geraria falsos alertas toda noite.
+//   Com os dois timers, o sistema aguarda pacientemente antes de avisar —
+//   se a temperatura voltar ao normal dentro do tempo configurado, silêncio total.
+//
+// ───────────────────────────────────────────────────────────────────────────────
+// DOIS TIMERS INDEPENDENTES (um por limiar, por sensor)
+// ───────────────────────────────────────────────────────────────────────────────
+//
+//   TIMER SUAVE (temp > temp_max_alerta)
+//   ┌─────────────────────────────────────────────────────────────────────────┐
+//   │  temp normal                                                            │
+//   │     │                                                                   │
+//   │     ▼ cruza temp_max_alerta                                             │
+//   │  AGUARDANDO ──── temp voltou ao normal antes do tempo de degelo ──────► IDLE
+//   │     │            (era degelo normal — silêncio total)                   │
+//   │     │ tempo de degelo expirou (padrão: 40 min)                          │
+//   │     ▼                                                                   │
+//   │  1º AVISO: "⚠️ ALERTA: Câmara X está em Y°C há 40 min!"                │
+//   │     │                                                                   │
+//   │     ▼ problema persiste                                                 │
+//   │  REPETIÇÃO a cada 30 min: "⚠️ AINDA EM ALERTA: Câmara X em Y°C"        │
+//   │     │                                                                   │
+//   │     ▼ temperatura volta ao normal                                       │
+//   │  NORMALIZADO: "✅ Normalizado: Câmara X voltou a Y°C"  ───────────────► IDLE
+//   └─────────────────────────────────────────────────────────────────────────┘
+//
+//   TIMER CRÍTICO (temp >= temp_critica)  ← corre em paralelo, independente
+//   ┌─────────────────────────────────────────────────────────────────────────┐
+//   │  temp abaixo do crítico                                                 │
+//   │     │                                                                   │
+//   │     ▼ cruza temp_critica                                                │
+//   │  AGUARDANDO ──── temp voltou abaixo do crítico antes do tempo ────────► IDLE
+//   │     │            (era pico passageiro — silêncio total)                 │
+//   │     │ tempo de espera expirou (padrão: 15 min)                          │
+//   │     ▼                                                                   │
+//   │  1º AVISO: "🚨 CRÍTICO: Câmara X está em Y°C!"                         │
+//   │     │                                                                   │
+//   │     ▼ problema persiste                                                 │
+//   │  REPETIÇÃO a cada 10 min: "🚨 AINDA CRÍTICO: Câmara X em Y°C"          │
+//   │     │                                                                   │
+//   │     ▼ temperatura cai abaixo do crítico                                 │
+//   │  SAIU DO CRÍTICO: "✅ Saiu do crítico: Câmara X agora em Y°C"           │
+//   │     │  (se ainda > temp_max_alerta: "ainda em alerta suave")            │
+//   │     ▼                                                                   │
+//   │  Timer crítico reseta — timer suave continua rodando normalmente ──────► IDLE
+//   └─────────────────────────────────────────────────────────────────────────┘
+//
+// ───────────────────────────────────────────────────────────────────────────────
+// REGRA DE PRIORIDADE — crítico suprime o suave
+// ───────────────────────────────────────────────────────────────────────────────
+//
+//   Quando temp >= temp_critica:
+//     → apenas o timer crítico envia mensagens
+//     → o timer suave continua rodando (contando o tempo), mas não avisa
+//     → isso evita receber dois avisos ao mesmo tempo para a mesma câmara
+//
+//   Quando temp cai para a faixa suave (entre alerta e crítico):
+//     → timer crítico reseta e envia "saiu do crítico"
+//     → timer suave assume — já sabe quanto tempo está acima do limite
+//
+// ───────────────────────────────────────────────────────────────────────────────
+// EXEMPLO REAL — câmara em degelo normal (sem nenhum aviso)
+// ───────────────────────────────────────────────────────────────────────────────
+//
+//   00:00  3°C   ambos os timers IDLE
+//   00:05  5°C   timer suave inicia (cruzou temp_max_alerta)
+//   00:20  9°C   timer crítico inicia (cruzou temp_critica) — suave suprimido
+//   00:35  7°C   temperatura caiu abaixo do crítico — timer crítico reseta (silêncio)
+//   00:45  3°C   temperatura normal — timer suave reseta (silêncio)
+//   resultado:   NENHUM AVISO ENVIADO — era degelo normal
+//
+// ───────────────────────────────────────────────────────────────────────────────
+// EXEMPLO REAL — problema real não resolvido
+// ───────────────────────────────────────────────────────────────────────────────
+//
+//   00:00  3°C   ambos os timers IDLE
+//   00:05  5°C   timer suave inicia
+//   00:45  5°C   timer suave expirou (40 min) → "⚠️ ALERTA"
+//   01:15  5°C   30 min depois → "⚠️ AINDA EM ALERTA"
+//   01:45  5°C   30 min depois → "⚠️ AINDA EM ALERTA"
+//   02:00  3°C   temperatura normal → "✅ Normalizado"
+//
+// ───────────────────────────────────────────────────────────────────────────────
+// CAMPOS CONFIGURÁVEIS (por sensor, via web portal)
+// ───────────────────────────────────────────────────────────────────────────────
+//
+//   temp_max_alerta          → limiar do alerta suave (ex: 4°C)
+//   tempo_degelo_min         → paciência antes do 1º aviso suave (padrão: 40 min)
+//   temp_critica             → limiar do alerta crítico (ex: 8°C)
+//   tempo_espera_critico_min → paciência antes do 1º aviso crítico (padrão: 15 min)
+//
+// INTERVALOS DE REPETIÇÃO (fixos no código, linha ~70)
+//   REPETICAO_SUAVE_MS   → a cada 30 min enquanto persistir em alerta
+//   REPETICAO_CRITICO_MS → a cada 10 min enquanto persistir em crítico
+//
+// ═══════════════════════════════════════════════════════════════════════════════
+
 #include "alert_manager.h"
 #include "../sensors/sensors.h"
 #include "../sensors/sensor_registry.h"
@@ -7,195 +110,285 @@
 #include <time.h>
 
 
-// Estrutura para controlar o tempo de cad sensora na RAM
+// ── INTERVALOS DE REPETIÇÃO ───────────────────────────────────────────────────
+// Enquanto o problema não for resolvido, o sistema continua avisando nestes intervalos
+// UL = unsigned long — necessário para multiplicações grandes sem overflow
+// 60000UL = 1 minuto em milissegundos
+const unsigned long REPETICAO_SUAVE_MS   = 30UL * 60000UL;  // avisa a cada 30 min se ainda em alerta
+const unsigned long REPETICAO_CRITICO_MS = 10UL * 60000UL;  // avisa a cada 10 min se ainda crítico
+
+
+// ── ESTADO DE ALERTA POR SENSOR ───────────────────────────────────────────────
+// Cada sensor tem dois timers independentes: um para o limiar suave, outro para o crítico
+// Ficam na RAM — são zerados ao reiniciar a placa (isso é esperado e correto)
 struct EstadoAlerta {
-    unsigned long inicioAlertaSuave = 0;
-    unsigned long inicioAlertaCritico = 0;
-    bool alertaEnviado = false;
+
+    // Timer do limiar suave (temp > temp_max_alerta)
+    unsigned long inicioSuave      = 0;     // millis() de quando cruzou o limiar suave
+                                            // 0 = temperatura está normal
+    bool          suaveAvisado     = false; // true = primeiro aviso já foi enviado
+    unsigned long ultimoAvisoSuave = 0;     // millis() do último aviso — controla repetição
+
+    // Timer do limiar crítico (temp >= temp_critica)
+    unsigned long inicioCritico      = 0;   // millis() de quando cruzou o limiar crítico
+    bool          criticoAvisado     = false;
+    unsigned long ultimoAvisoCritico = 0;
 };
 
+// Um estado para cada sensor possível — alocado em tempo de compilação
+// static = só existe neste arquivo, não vaza para o restante do projeto
 static EstadoAlerta estados[MAX_SENSORES];
 
-// --- FUNÇÃO AUXILIAR: VERIFICA AGENDA ---
-// Retorna true = pode monitrar / false = fora da agenda, ignorar
-bool estaNoHorarioDeMonitoramento (const SensorConfig& s) {
 
-    // Busca a hora atual do sistema (vinda NTP)
+// ── FUNÇÕES AUXILIARES DE RESET ───────────────────────────────────────────────
+// Centraliza o reset para não repetir as mesmas linhas em vários lugares
+// EstadoAlerta& e = referência — altera o estado original, não uma cópia
+
+static void resetarSuave(EstadoAlerta& e) {
+    e.inicioSuave      = 0;
+    e.suaveAvisado     = false;
+    e.ultimoAvisoSuave = 0;
+}
+
+static void resetarCritico(EstadoAlerta& e) {
+    e.inicioCritico      = 0;
+    e.criticoAvisado     = false;
+    e.ultimoAvisoCritico = 0;
+}
+
+
+// ── FUNÇÃO AUXILIAR: VERIFICA AGENDA ─────────────────────────────────────────
+// Retorna true = pode monitorar / false = fora da agenda, ignorar
+bool estaNoHorarioDeMonitoramento(const SensorConfig& s) {
+
     struct tm timeinfo;
-    // Se relógio não estiver sincronizado, monitora por segurança
+    // Se o relógio não estiver sincronizado, monitora por segurança
     if (!getLocalTime(&timeinfo)) return true;
 
     // Descobre qual é o dia de hoje (0=Dom, 1=Seg, ... 6=Sab)
     uint8_t diaAtual = timeinfo.tm_wday;
+    uint8_t modo     = s.dia_modo[diaAtual];
 
-    // Lê o modo configurado para hoje neste sensor
-    uint8_t modo = s.dia_modo[diaAtual];
+    if (modo == DIA_DESLIGADO) return false;
+    if (modo == DIA_24H)       return true;
 
-     // ── MODO DESLIGADO ──────────────────────────────────────────────
-     // Dia configurado como desligado - não monitora
-     if (modo == DIA_DESLIGADO) return false;
+    // Modo horário — converte tudo para minutos desde 00:00 para facilitar comparação
+    // Ex.: 08:30 = (8 * 60) + 30 = 510 minutos do dia
+    int minAtual  = (timeinfo.tm_hour             * 60) + timeinfo.tm_min;
+    int minInicio = (s.dia_hora_inicio[diaAtual]  * 60) + s.dia_min_inicio[diaAtual];
+    int minFim    = (s.dia_hora_fim[diaAtual]     * 60) + s.dia_min_fim[diaAtual];
 
-      // ── MODO 24H ────────────────────────────────────────────────────
-      // Dia configurado para monitorar o dia todo
-      if (modo == DIA_24H) return true;
+    // Janela normal (ex: 08:00 → 20:00) — não vira meia-noite
+    if (minInicio <= minFim)
+        return (minAtual >= minInicio && minAtual < minFim);
 
-      // ── MODO HORÁRIO ─────────────────────────────────────────────────
-      // Usar a janela configurada para ESTE dia especificamente
-      // Converte hora atual e os limites para minutos dede 00:00
-      // Ex.: 08:30 = (8 * 60) + 30 = 510 minutos do dia - facilita comparação
-      int minAtual  = (timeinfo.tm_hour              *60) + timeinfo.tm_min;
-      int minInicio = (s.dia_hora_inicio[diaAtual]   *60) + s.dia_min_inicio[diaAtual];
-      int minFim    = (s.dia_hora_fim[diaAtual]      *60) + s.dia_min_fim[diaAtual];
-
-      // Caso 1: janela normal, não vira meia-noite (ex: 08:00 → 20:00)
-      if (minInicio <= minFim){                                 // JANELA NORMAL - não vira meia noite
-        return (minAtual >= minInicio && minAtual < minFim);    // confere se está em horário de monitoramento
-                                                                // ja retorna TRUE ou FALSE
-      }
-
-      // Caso 2: janela vira meia-noite (ex: 22:00 → 06:00)
-      // Monitora das 22h até as 23:59 OU das 00:00 até as 06:00
-      return (minAtual >= minInicio || minAtual < minFim);      // retorna TRUE ou FALSE
+    // Janela que vira meia-noite (ex: 22:00 → 06:00)
+    // Monitora das 22h até as 23:59 OU das 00:00 até as 06:00
+    return (minAtual >= minInicio || minAtual < minFim);
 }
 
 
-// --- FUNÇÃO PARA O BOTÃO MUDO ---
+// ── FUNÇÃO PARA O BOTÃO MUDO ──────────────────────────────────────────────────
 void alert_setModoManutencao(const String& id_fisico, uint8_t horas) {
     SensorConfig s;
-    // registry_buscardPorID (aponta para as configurações do sensor buscado)
-    if (registry_buscarPorID(id_fisico,s)) {
-        // converte horas em milisegundos
-        // define até quando o sensor vai ficar mudo
-        s.mudo_ate = millis() + ((unsigned long)horas *3600000UL);        //transforma 3600000 em Long, int é menor e pode ser negativo
-        // grava na memória até quando vai ficar mudo
+    if (registry_buscarPorID(id_fisico, s)) {
+        // millis() + horas em ms = timestamp de quando o silêncio termina
+        s.mudo_ate = millis() + ((unsigned long)horas * 3600000UL);
         registry_salvar(s);
         LOG("Alerta: " + s.nome_amigavel + " silenciado por " + String(horas) + "h");
     }
 }
 
-// --- FUNÇÃO PRINCIPAL DE LÓGICA ---
+
+// ── FUNÇÃO PRINCIPAL DE LÓGICA ────────────────────────────────────────────────
+//
+// Fluxo para cada sensor:
+//  ├─ Monitoramento desligado? → pula
+//  ├─ Em manutenção (mudo)? → pula (ou libera se o tempo acabou)
+//  ├─ Fora da agenda? → zera estados e pula
+//  ├─ Sensor desconectado? → pula
+//  ├─ Temp >= crítica? → timer crítico (paciência curta) → avisa + repete
+//  ├─ Temp > alerta (mas < crítica)? → timer suave (tempo de degelo) → avisa + repete
+//  └─ Temp normal? → zera tudo, avisa normalização se necessário
+//
 void processarLogicaAlertas() {
     auto cadastrados = registry_getTodos();
 
     for (const auto& s : cadastrados) {
 
+        // ── 1. Monitoramento desligado ────────────────────────────────────
         if (!s.monitoramento_ativo) continue;
 
-        // 1 - Verifica Modo Manutenção (MUDO)
-        //  maior que zero = está em manutenção
+        // ── 2. Modo manutenção (mudo) ─────────────────────────────────────
+        // mudo_ate > 0 significa que está silenciado até aquele timestamp
         if (s.mudo_ate > 0) {
-            // ATENÇÃO: millis() retorna milisecondes desde o boot e transborda para 0 após ~49 dias
-            // Nunca usar comparação direta(millis() < alvo), usar subtração (millis()- alvo)
-            // MELHORIA:
-            // millis() transbora após ~49 dias, 
-            // comparando (millis() < mudo_ate), após overflow millis fica menor, que mudo_ate , sensor fica mudo para sempre
-            // (millis() - mudo_ate) funciona bem com overflow, subtração do unsigned long transbor de forma previsível
-            if ((long)(millis() - s.mudo_ate) < 0) continue;
+            // Subtração com unsigned long funciona corretamente mesmo após overflow
+            // do millis() em ~49 dias — nunca comparar diretamente
+            if ((long)(millis() - s.mudo_ate) < 0) continue;  // ainda em manutenção
             else {
+                // Tempo de manutenção acabou — libera o sensor
                 SensorConfig s_upd = s;
                 s_upd.mudo_ate = 0;
                 registry_salvar(s_upd);
             }
         }
 
-        // 2 - Verifica Agenda
+        // ── 3. Fora da agenda ─────────────────────────────────────────────
         if (!estaNoHorarioDeMonitoramento(s)) {
-            // Se está fora do horário, "Limpamos a memória" de alertas desse sensor
-            // Primeiro descobrimos qual é o índice (idx) deste sensor na nossa lista de estados
-            int idx = -1;
-            for (int i = 0; i < hw_getContagem(); i ++) {
-                if (hw_getID(i) == s.id_fisico) {
-                    idx = i;
-                    break;
-                }
-            }
-            
-            // Se achamos o sensor, zeramos todos os alertas dele
-            if (idx != -1) {
-                estados[idx].inicioAlertaSuave = 0;
-                estados[idx].inicioAlertaCritico = 0;
-                estados[idx].alertaEnviado = false;
-            }
 
-            continue; // pula para o próximo sensor, pois está no horário de folga
-        
+            // Por que zerar os timers aqui?
+            // Os timers ficam em estados[idx] — indexados pela posição do sensor
+            // no barramento físico (hardware), não pelo cadastro (registry).
+            // Se não zerarmos, o timer continua "congelado" no tempo em que saiu
+            // da agenda. Quando o monitoramento voltar, o sistema acharia que o
+            // sensor já está em alerta há horas — e mandaria aviso errado.
+            // Zerando aqui, ele começa do zero quando a agenda reativar.
+            //
+            // Precisamos do idx aqui para acessar estados[idx].
+            // O passo 5 também busca o idx, mas ele nunca chega a rodar para
+            // este sensor neste ciclo — o continue abaixo pula tudo.
+            // Por isso buscamos o idx aqui de forma local, só para o reset.
+            int idx = -1;
+            for (int i = 0; i < hw_getContagem(); i++) {
+                if (hw_getID(i) == s.id_fisico) { idx = i; break; }
+            }
+            if (idx != -1) {
+                resetarSuave(estados[idx]);
+                resetarCritico(estados[idx]);
+            }
+            continue;  // pula para o próximo sensor — fora do horário de monitoramento
         }
 
-        // Pega temperatura
+        // ── 4. Lê temperatura ─────────────────────────────────────────────
         float temp = hw_getTemp(s.id_fisico);
+        if (temp == DEVICE_DISCONNECTED_C) continue;  // sensor offline — pula
 
-        if (temp == DEVICE_DISCONNECTED_C) continue;
-
-        
-        // Busca o índice deste sensor na lista de hardware
-        // Precisamos do índice para acesssar estados[idx] - memória de alertas
+        // ── 5. Busca o índice do sensor na lista de hardware ──────────────
+        // Precisamos do índice para acessar estados[idx]
         int idx = -1;
         for (int i = 0; i < hw_getContagem(); i++) {
-            if(hw_getID(i) == s.id_fisico){
-                idx = i;
-                break; // achou - pode parar de procurar
-            }
+            if (hw_getID(i) == s.id_fisico) { idx = i; break; }
         }
-
-        // Se o sensor não foi encontrado no hardware, pula
         if (idx == -1) continue;
 
-        // ── 3. ALERTA CRÍTICO ──────────────────────────────────────────
-        // Temperatura crítica = perigo imediato, avisa na hora,  sem esperar
+        // EstadoAlerta& e = referência direta ao estado deste sensor na lista
+        // Com &, qualquer alteração em "e" altera diretamente estados[idx] — sem cópia
+        EstadoAlerta& e = estados[idx];
+
+
+        // ══════════════════════════════════════════════════════════════════
+        // ── 6. LIMIAR CRÍTICO (temp >= temp_critica) ──────────────────────
+        // Timer independente com paciência curta — crítico é urgente
+        // Mas ainda dá um tempo para picos passageiros (porta aberta, degelo intenso)
+        // ══════════════════════════════════════════════════════════════════
         if (temp >= s.temp_critica) {
-            if(!estados[idx].alertaEnviado){
-                // String (temp,1) = temperatura com 1 casa decima. ex.: "8.3"
-                enviarMensagemTelegram("🚨 CRÍTICO: " + s.nome_amigavel + 
-                                       " está em " + String(temp,1) + "°C!");
-                estados[idx].alertaEnviado = true;
+
+            // Primeira vez acima do crítico — anota o horário
+            if (e.inicioCritico == 0) {
+                e.inicioCritico = millis();
+                LOG("Timer crítico iniciado: " + s.nome_amigavel + " " + String(temp, 1) + "°C");
             }
-            continue;   //não precisa checar alerta suave
+
+            // Converte tempo_espera_critico_min (minutos) para milissegundos
+            unsigned long esperaCriticoMs = (unsigned long)s.tempo_espera_critico_min * 60000UL;
+
+            // Ainda dentro do tempo de paciência? Aguarda silenciosamente
+            // (se cair antes de expirar, o timer será zerado na seção 7)
+            if ((millis() - e.inicioCritico) < esperaCriticoMs) continue;
+
+            // Tempo expirou — é um crítico real, não um pico passageiro
+            if (!e.criticoAvisado) {
+                // Primeiro aviso crítico
+                enviarMensagemTelegram("🚨 CRÍTICO: " + s.nome_amigavel +
+                                       " está em " + String(temp, 1) + "°C!");
+                e.criticoAvisado     = true;
+                e.ultimoAvisoCritico = millis();
+            }
+            else if ((millis() - e.ultimoAvisoCritico) >= REPETICAO_CRITICO_MS) {
+                // Repetição — problema não foi resolvido, insiste no aviso
+                enviarMensagemTelegram("🚨 AINDA CRÍTICO: " + s.nome_amigavel +
+                                       " continua em " + String(temp, 1) + "°C!");
+                e.ultimoAvisoCritico = millis();
+            }
+
+            continue;  // crítico ativo — não processa suave neste ciclo (prioridade)
         }
 
-        // ── 4. ALERTA SUAVE ─────────────────────────────────────────────
-        // Temperatura acima do limite, mas espera tempo_espera_min antes de avisar
-        // Evita alarmes falsos por picos rápidos (ex: porta do freezer aberta)
+
+        // ══════════════════════════════════════════════════════════════════
+        // ── 7. SAIU DA ZONA CRÍTICA ───────────────────────────────────────
+        // Se chegou aqui: temp < temp_critica
+        // Se o timer crítico estava rodando, reseta (era passageiro ou foi resolvido)
+        // ══════════════════════════════════════════════════════════════════
+        if (e.inicioCritico > 0) {
+            if (e.criticoAvisado) {
+                // Informa a saída do crítico — inclui contexto se ainda estiver em alerta suave
+                String msg = "✅ Saiu do crítico: " + s.nome_amigavel +
+                             " agora em " + String(temp, 1) + "°C";
+                if (temp > s.temp_max_alerta) {
+                    msg += " (ainda em alerta suave)";
+                }
+                enviarMensagemTelegram(msg);
+            }
+            resetarCritico(e);
+            // Nota: o timer suave continua rodando normalmente
+            // Se estava acima do suave antes de entrar no crítico, o tempo já está contando
+        }
+
+
+        // ══════════════════════════════════════════════════════════════════
+        // ── 8. LIMIAR SUAVE (temp > temp_max_alerta) ──────────────────────
+        // Timer independente com paciência longa — cobre ciclos de degelo normais
+        // Só avisa se a temperatura não voltar ao normal dentro do tempo de degelo
+        // ══════════════════════════════════════════════════════════════════
         if (temp > s.temp_max_alerta) {
-            if(estados[idx].inicioAlertaSuave == 0){
-                //Primeira vez acima do limite - anota o horário
-                estados[idx].inicioAlertaSuave = millis();
+
+            // Primeira vez acima do limiar suave — anota o horário
+            if (e.inicioSuave == 0) {
+                e.inicioSuave = millis();
+                LOG("Timer suave iniciado: " + s.nome_amigavel + " " + String(temp, 1) + "°C");
             }
 
-            // Quanto tempo já está acima do limite?
-            unsigned long tempoEsperando = millis() - estados[idx].inicioAlertaSuave;
+            // Converte tempo_degelo_min (minutos) para milissegundos
+            unsigned long degelo_ms = (unsigned long)s.tempo_degelo_min * 60000UL;
 
-            // Converte tempo_espera_min (minutos) para milisegundos
-            // 60000UL = 60.000 em unsigned long (evita overflow igual ao mudo_ate) 
-            unsigned long limiteMs = (unsigned long)s.tempo_espera_min * 60000UL;
+            // Ainda dentro do tempo de degelo? Aguarda silenciosamente
+            // Degelo normal resolve dentro desse tempo — nenhum aviso necessário
+            if ((millis() - e.inicioSuave) < degelo_ms) continue;
 
-            // Se passou do tempo E ainda não avisou - manda o alerta
-            if (tempoEsperando >= limiteMs && !estados[idx].alertaEnviado){
+            // Tempo de degelo expirou — temperatura não voltou, é um problema real
+            if (!e.suaveAvisado) {
+                // Primeiro aviso suave
                 enviarMensagemTelegram("⚠️ ALERTA: " + s.nome_amigavel +
-                                      " está em " + String(temp,1) + "°C há " +
-                                      String(s.tempo_espera_min) + " min!");
-                estados[idx].alertaEnviado = true;
-
+                                       " está em " + String(temp, 1) + "°C há " +
+                                       String(s.tempo_degelo_min) + " min!");
+                e.suaveAvisado     = true;
+                e.ultimoAvisoSuave = millis();
             }
+            else if ((millis() - e.ultimoAvisoSuave) >= REPETICAO_SUAVE_MS) {
+                // Repetição — problema persiste, insiste no aviso
+                enviarMensagemTelegram("⚠️ AINDA EM ALERTA: " + s.nome_amigavel +
+                                       " continua em " + String(temp, 1) + "°C!");
+                e.ultimoAvisoSuave = millis();
+            }
+
             continue;
         }
-    // ── 5. TEMPERATURA NORMAL ───────────────────────────────────────
-    // Temperatura voltou ao normal — reseta tudo para o  próximo ciclo
-    estados[idx].inicioAlertaSuave   = 0;
-    estados[idx].inicioAlertaCritico = 0;
-    estados[idx].alertaEnviado       = false; 
 
+
+        // ══════════════════════════════════════════════════════════════════
+        // ── 9. TEMPERATURA NORMAL ─────────────────────────────────────────
+        // Se chegou aqui: temp <= temp_max_alerta — câmara está OK
+        // ══════════════════════════════════════════════════════════════════
+
+        // Se tinha avisado antes, informa a normalização
+        if (e.suaveAvisado) {
+            enviarMensagemTelegram("✅ Normalizado: " + s.nome_amigavel +
+                                   " voltou a " + String(temp, 1) + "°C");
+        }
+
+        // Zera tudo — pronto para o próximo ciclo de monitoramento
+        resetarSuave(e);
+        resetarCritico(e);  // reseta também o crítico, caso tenha sido passageiro sem aviso
     }
-
 }
-
-  //Para cada sensor:
-  //  ├─ Monitoramento desligado? → pula
-  //  ├─ Em manutenção (mudo)? → pula
-  //  ├─ Fora da agenda? → zera estados e pula
-  //  ├─ Sensor desconectado? → pula
-  //  ├─ Temp >= crítica? → avisa imediatamente (se ainda não avisou)
-  //  ├─ Temp >= alerta? → inicia timer → avisa após tempo_espera_min
-  //  └─ Temp normal? → zera tudo (pronto para próximo alerta)
-
-
-

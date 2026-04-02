@@ -39,9 +39,10 @@ static void gravarNoNVS(){
         JsonObject obj = array.add<JsonObject>();
         obj["id_fisico"]            = s.id_fisico;
         obj["nome_amigavel"]        = s.nome_amigavel;
-        obj["temp_max_alerta"]      = s.temp_max_alerta;
-        obj["tempo_espera_min"]     = s.tempo_espera_min;
-        obj["temp_critica"]         = s.temp_critica;
+        obj["temp_max_alerta"]          = s.temp_max_alerta;
+        obj["tempo_degelo_min"]         = s.tempo_degelo_min;
+        obj["temp_critica"]             = s.temp_critica;
+        obj["tempo_espera_critico_min"] = s.tempo_espera_critico_min;
         obj["monitoramento_ativo"]  = s.monitoramento_ativo;
         obj["horas_mudo_padrao"]    = s.horas_mudo_padrao;
         
@@ -94,9 +95,10 @@ void registry_iniciar () {
             SensorConfig s;
             s.id_fisico = obj["id_fisico"].as<String>();
             s.nome_amigavel = obj["nome_amigavel"].as<String>();
-            s.temp_max_alerta = obj["temp_max_alerta"].as<float>();
-            s.tempo_espera_min = obj["tempo_espera_min"].as<uint16_t>();
-            s.temp_critica = obj["temp_critica"].as<float>();
+            s.temp_max_alerta           = obj["temp_max_alerta"].as<float>();
+            s.tempo_degelo_min          = obj["tempo_degelo_min"].as<uint16_t>();
+            s.temp_critica              = obj["temp_critica"].as<float>();
+            s.tempo_espera_critico_min  = obj["tempo_espera_critico_min"].as<uint16_t>();
             s.monitoramento_ativo = obj["monitoramento_ativo"].as<bool>();
             s.horas_mudo_padrao = obj["horas_mudo_padrao"].as<uint8_t>();
             

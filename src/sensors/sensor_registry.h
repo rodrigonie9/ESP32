@@ -27,9 +27,10 @@
 struct SensorConfig {
     String id_fisico;               //  ID Fisico sensor DS18B20
     String nome_amigavel;           // nome definido pelo usuário
-    float temp_max_alerta;          // Limite para o alerta
-    uint16_t tempo_espera_min;      // Tempo para igonorar temperatura alta
-    float temp_critica;             // Limite grave, avisa imediatamente
+    float temp_max_alerta;              // Limite para o alerta suave
+    uint16_t tempo_degelo_min;          // Tempo de paciência antes de avisar alerta suave (cobre ciclos de degelo)
+    float temp_critica;                 // Limite grave
+    uint16_t tempo_espera_critico_min;  // Tempo de paciência antes de avisar crítico
     bool monitoramento_ativo;       // Monitoramento ligado / desligado
     unsigned long mudo_ate;         // Timestamp para modo manutenção (0 = normal)
     uint8_t horas_mudo_padrao;      // Duração botão de silencio (1h, 2h,....24h)
