@@ -25,8 +25,11 @@
 //Estrutura do cadastro do sensor
 // Ficha de cada sensor
 struct SensorConfig {
-    String id_fisico;               //  ID Fisico sensor DS18B20
-    String nome_amigavel;           // nome definido pelo usuário
+    String  id_fisico;              //  ID Fisico sensor DS18B20
+    uint8_t id_sensor = 255;        // ID estável para NVS (0-29), 255 = não atribuído
+                                    // utilizado para identificar o sensor em runtime 
+                                    //  atriuido durante a correção de pegar a hora de início de alertas (sem mudar o sensor config, usando o estado alertas)
+    String  nome_amigavel;          // nome definido pelo usuário
     float temp_max_alerta;              // Limite para o alerta suave
     uint16_t tempo_degelo_min;          // Tempo de paciência antes de avisar alerta suave (cobre ciclos de degelo)
     float temp_critica;                 // Limite grave

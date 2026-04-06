@@ -114,8 +114,8 @@
 // Enquanto o problema não for resolvido, o sistema continua avisando nestes intervalos
 // UL = unsigned long — necessário para multiplicações grandes sem overflow
 // 60000UL = 1 minuto em milissegundos
-const unsigned long REPETICAO_SUAVE_MS   = 30UL * 60000UL;  // avisa a cada 30 min se ainda em alerta
-const unsigned long REPETICAO_CRITICO_MS = 10UL * 60000UL;  // avisa a cada 10 min se ainda crítico
+const unsigned long REPETICAO_SUAVE_S   = 30UL * 60UL;  // avisa a cada 30 min se ainda em alerta
+const unsigned long REPETICAO_CRITICO_S = 10UL * 60UL;  // avisa a cada 10 min se ainda crítico
 
 
 // ── ESTADO DE ALERTA POR SENSOR ───────────────────────────────────────────────
@@ -124,13 +124,13 @@ const unsigned long REPETICAO_CRITICO_MS = 10UL * 60000UL;  // avisa a cada 10 m
 struct EstadoAlerta {
 
     // Timer do limiar suave (temp > temp_max_alerta)
-    unsigned long inicioSuave      = 0;     // millis() de quando cruzou o limiar suave
+    time_t        inicioSuave      = 0;     // Unix timestamp de quando cruzou o limiar suave
                                             // 0 = temperatura está normal
     bool          suaveAvisado     = false; // true = primeiro aviso já foi enviado
     unsigned long ultimoAvisoSuave = 0;     // millis() do último aviso — controla repetição
 
     // Timer do limiar crítico (temp >= temp_critica)
-    unsigned long inicioCritico      = 0;   // millis() de quando cruzou o limiar crítico
+    time_t        inicioCritico      = 0;   // Unix timestamp de quando cruzou o limiar crítico
     bool          criticoAvisado     = false;
     unsigned long ultimoAvisoCritico = 0;
 };
@@ -285,16 +285,18 @@ void processarLogicaAlertas() {
 
             // Primeira vez acima do crítico — anota o horário
             if (e.inicioCritico == 0) {
-                e.inicioCritico = millis();
+                time(&e.inicioCritico);
                 LOG("Timer crítico iniciado: " + s.nome_amigavel + " " + String(temp, 1) + "°C");
             }
 
-            // Converte tempo_espera_critico_min (minutos) para milissegundos
-            unsigned long esperaCriticoMs = (unsigned long)s.tempo_espera_critico_min * 60000UL;
+            // Converte tempo_espera_critico_min (minutos) para segundos
+            unsigned long esperaCriticoS = (unsigned long)s.tempo_espera_critico_min * 60UL;
 
             // Ainda dentro do tempo de paciência? Aguarda silenciosamente
             // (se cair antes de expirar, o timer será zerado na seção 7)
-            if ((millis() - e.inicioCritico) < esperaCriticoMs) continue;
+            time_t agora;
+            time(&agora);
+            if ((agora - e.inicioCritico) < (time_t)esperaCriticoS) continue;
 
             // Tempo expirou — é um crítico real, não um pico passageiro
             if (!e.criticoAvisado) {
@@ -304,7 +306,7 @@ void processarLogicaAlertas() {
                 e.criticoAvisado     = true;
                 e.ultimoAvisoCritico = millis();
             }
-            else if ((millis() - e.ultimoAvisoCritico) >= REPETICAO_CRITICO_MS) {
+            else if ((millis() - e.ultimoAvisoCritico) >= REPETICAO_CRITICO_S * 1000UL) {
                 // Repetição — problema não foi resolvido, insiste no aviso
                 enviarMensagemTelegram("🚨 AINDA CRÍTICO: " + s.nome_amigavel +
                                        " continua em " + String(temp, 1) + "°C!");
@@ -345,16 +347,18 @@ void processarLogicaAlertas() {
 
             // Primeira vez acima do limiar suave — anota o horário
             if (e.inicioSuave == 0) {
-                e.inicioSuave = millis();
+                time(&e.inicioSuave);
                 LOG("Timer suave iniciado: " + s.nome_amigavel + " " + String(temp, 1) + "°C");
             }
 
-            // Converte tempo_degelo_min (minutos) para milissegundos
-            unsigned long degelo_ms = (unsigned long)s.tempo_degelo_min * 60000UL;
+            // Converte tempo_degelo_min (minutos) para segundos
+            unsigned long degelo_s = (unsigned long)s.tempo_degelo_min * 60UL;
 
             // Ainda dentro do tempo de degelo? Aguarda silenciosamente
             // Degelo normal resolve dentro desse tempo — nenhum aviso necessário
-            if ((millis() - e.inicioSuave) < degelo_ms) continue;
+            time_t agora;
+            time(&agora);
+            if ((agora - e.inicioSuave) < (time_t)degelo_s) continue;
 
             // Tempo de degelo expirou — temperatura não voltou, é um problema real
             if (!e.suaveAvisado) {
@@ -365,7 +369,7 @@ void processarLogicaAlertas() {
                 e.suaveAvisado     = true;
                 e.ultimoAvisoSuave = millis();
             }
-            else if ((millis() - e.ultimoAvisoSuave) >= REPETICAO_SUAVE_MS) {
+            else if ((millis() - e.ultimoAvisoSuave) >= REPETICAO_SUAVE_S * 1000UL) {
                 // Repetição — problema persiste, insiste no aviso
                 enviarMensagemTelegram("⚠️ AINDA EM ALERTA: " + s.nome_amigavel +
                                        " continua em " + String(temp, 1) + "°C!");

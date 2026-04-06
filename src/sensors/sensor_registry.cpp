@@ -2,6 +2,7 @@
 
 #include "sensor_registry.h"
 #include "../debug.h"
+#include "../config/system_limits.h"
 
 #include <Preferences.h>            // para acessar nvs
 #include <ArduinoJson.h>            // biblioteca json, transformar lista de sensores em texto (json), salvar na memória
@@ -38,6 +39,7 @@ static void gravarNoNVS(){
     for (const auto& s : sensoresCadastrados) {
         JsonObject obj = array.add<JsonObject>();
         obj["id_fisico"]            = s.id_fisico;
+        obj["id_sensor"]            = s.id_sensor;
         obj["nome_amigavel"]        = s.nome_amigavel;
         obj["temp_max_alerta"]          = s.temp_max_alerta;
         obj["tempo_degelo_min"]         = s.tempo_degelo_min;
@@ -93,7 +95,8 @@ void registry_iniciar () {
         JsonArray array = doc.as<JsonArray>();
         for (JsonObject obj : array) {
             SensorConfig s;
-            s.id_fisico = obj["id_fisico"].as<String>();
+            s.id_fisico   = obj["id_fisico"].as<String>();
+            s.id_sensor   = obj["id_sensor"]  | 255;   // 255 = não atribuído (sensor antigo sem id)
             s.nome_amigavel = obj["nome_amigavel"].as<String>();
             s.temp_max_alerta           = obj["temp_max_alerta"].as<float>();
             s.tempo_degelo_min          = obj["tempo_degelo_min"].as<uint16_t>();
@@ -152,8 +155,26 @@ bool registry_salvar (const SensorConfig& config) {
         }
     }
 
-    if (!encontrado){
-        sensoresCadastrados.push_back(config);      // adiciona novo se não existir
+    if (!encontrado) {
+        // Cria cópia para poder atribuir o id_sensor (config é const)
+        SensorConfig novoSensor = config;
+
+        // Encontra o menor id disponível entre 0 e MAX_SENSORES-1
+        for (int i = 0; i < MAX_SENSORES; i++) {
+            bool emUso = false;
+            for (const auto& s : sensoresCadastrados) {
+                if (s.id_sensor == i) {
+                    emUso = true;
+                    break;  // esse id já pertence a outro sensor — testa o próximo
+                }
+            }
+            if (!emUso) {
+                novoSensor.id_sensor = i;  // id livre encontrado — atribui
+                break;
+            }
+        }
+
+        sensoresCadastrados.push_back(novoSensor);
     }
     
     gravarNoNVS();    //salva a mudança na memória flash (NVS)
