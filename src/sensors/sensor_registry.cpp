@@ -128,7 +128,27 @@ void registry_iniciar () {
 
             s.mudo_ate = 0; // Reset do modo mudo ao reiniciar
             sensoresCadastrados.push_back(s);
-        } 
+        }
+
+        // ── ATRIBUIÇÃO DE IDs NO BOOT ──────────────────────────────────────
+        // Sensores migrados de versões antigas chegam com id_sensor = 255
+        // Percorre a lista e atribui o menor id disponível para quem ainda não tem
+        bool algumSemId = false;
+        for (auto& s : sensoresCadastrados) {
+            if (s.id_sensor != 255) continue;  // já tem id — pula
+            algumSemId = true;
+            for (int i = 0; i < MAX_SENSORES; i++) {
+                bool emUso = false;
+                for (const auto& outro : sensoresCadastrados) {
+                    if (outro.id_sensor == i) { emUso = true; break; }
+                }
+                if (!emUso) { s.id_sensor = i; break; }
+            }
+            LOG("ID atribuído: " + s.nome_amigavel + " → id_sensor=" + String(s.id_sensor));
+        }
+        // Se algum sensor recebeu id novo, persiste imediatamente na NVS
+        if (algumSemId) gravarNoNVS();
+
         LOG("Registry: " + String(sensoresCadastrados.size()) + " sensores.");
 
     } else {
