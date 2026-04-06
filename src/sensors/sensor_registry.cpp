@@ -140,13 +140,35 @@ void registry_iniciar () {
 }
 
 
-//adiciona um novo sensor, ou atualiza um que já existe
-// auto = descubra sozinho que tipo de variável é essa
-    //percorre lista, procrando se ID físico já existe
-    //se existir atualiza o nome e o limite
-    //se for novo empurra (push_back), para final da lista
-    //no fim chama gravarSensoresNVS, atualizar na NVS
-bool registry_salvar (const SensorConfig& config) {
+// ── FUNÇÃO AUXILIAR: PRÓXIMO ID DISPONÍVEL ────────────────────────────────────
+// Percorre os ids de 0 até MAX_SENSORES-1 e retorna o primeiro que não está em uso.
+// Retorna 255 se todos os 30 slots estiverem ocupados (não deve acontecer na prática).
+// static = só existe neste arquivo
+static uint8_t proximoIdDisponivel() {
+    for (int i = 0; i < MAX_SENSORES; i++) {
+        bool emUso = false;
+        for (const auto& s : sensoresCadastrados) {
+            if (s.id_sensor == i) { emUso = true; break; }
+        }
+        if (!emUso) return i;
+    }
+    return 255;  // todos os slots ocupados
+}
+
+
+// Adiciona um novo sensor ou atualiza um que já existe
+//
+// REGRA DO id_sensor:
+//   Uma vez atribuído (valor diferente de 255), o id NUNCA muda.
+//   Isso garante que a NVS de alertas (indexada por id_sensor) permaneça consistente
+//   mesmo após edições ou reboots.
+//
+//   Dois bugs que esta lógica evita:
+//   - Sensor antigo (salvo antes do campo existir) chegava com id=255 e nunca saía do 255,
+//     porque o bloco "encontrado" fazia s=config e copiava o 255 sem atribuir nada.
+//   - Cadastro duplo (F5 ou clique duplo no botão) sobrescrevia um id válido com 255,
+//     porque o sensor passava pelo bloco "encontrado" trazendo id=255 no config.
+bool registry_salvar(const SensorConfig& config) {
     bool encontrado = false;
     for (auto& s : sensoresCadastrados) {
         if (s.id_fisico == config.id_fisico) {
