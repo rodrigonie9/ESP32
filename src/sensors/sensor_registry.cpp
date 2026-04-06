@@ -172,35 +172,41 @@ bool registry_salvar(const SensorConfig& config) {
     bool encontrado = false;
     for (auto& s : sensoresCadastrados) {
         if (s.id_fisico == config.id_fisico) {
-            s = config;             //atauliza os dados se o sensor ID já exisitir
-            encontrado = true; 
+
+            // Preserva o id_sensor existente antes de sobrescrever os outros campos
+            // (o config que chega pode trazer id=255 — não deve regredir um id válido)
+            uint8_t idAnterior = s.id_sensor;
+            s = config;                          // copia nome, temp, agenda, etc.
+
+            // Decide o id final:
+            // - se o config já trouxe um id válido, usa ele
+            // - senão, restaura o id que o sensor já tinha
+            // - se ambos eram 255 (sensor antigo), atribui um id novo agora
+            if (s.id_sensor == 255) {
+                s.id_sensor = idAnterior;        // restaura o id original
+            }
+            if (s.id_sensor == 255) {
+                s.id_sensor = proximoIdDisponivel(); // atribui pela 1ª vez
+            }
+
+            encontrado = true;
             break;
         }
     }
 
     if (!encontrado) {
-        // Cria cópia para poder atribuir o id_sensor (config é const)
+        // Sensor novo — cria cópia para poder atribuir o id_sensor (config é const)
         SensorConfig novoSensor = config;
 
-        // Encontra o menor id disponível entre 0 e MAX_SENSORES-1
-        for (int i = 0; i < MAX_SENSORES; i++) {
-            bool emUso = false;
-            for (const auto& s : sensoresCadastrados) {
-                if (s.id_sensor == i) {
-                    emUso = true;
-                    break;  // esse id já pertence a outro sensor — testa o próximo
-                }
-            }
-            if (!emUso) {
-                novoSensor.id_sensor = i;  // id livre encontrado — atribui
-                break;
-            }
+        // Se veio sem id (255), atribui o menor disponível
+        if (novoSensor.id_sensor == 255) {
+            novoSensor.id_sensor = proximoIdDisponivel();
         }
 
         sensoresCadastrados.push_back(novoSensor);
     }
-    
-    gravarNoNVS();    //salva a mudança na memória flash (NVS)
+
+    gravarNoNVS();    // salva a mudança na memória flash (NVS)
     return true;
 }
 
@@ -229,6 +235,7 @@ const String& registry_getNome(const String& id_fisico) {
     // Se não encontrou nada retonar o próprio ID
     return id_fisico;
 }
+
 
 // Busca a configuração completa de um sensor específico
 // buscar por um ID, quando encontra esse ID, ele copia os daodos deste sensor para o variável chamada na função config

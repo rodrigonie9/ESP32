@@ -105,6 +105,7 @@
 #include "../sensors/sensors.h"
 #include "../sensors/sensor_registry.h"
 #include "../telegram/telegram.h"
+#include "../device/device_config.h"
 #include "../debug.h"
 #include "../config/system_limits.h"
 #include <time.h>
@@ -353,8 +354,10 @@ void processarLogicaAlertas() {
                 EstadoAlerta& e = estados[idx];
                 e.ciclosErro++;
                 if (e.ciclosErro >= 5 && !e.erroAvisado) {
-                    enviarMensagemTelegram("⚠️ SENSOR OFFLINE: " + s.nome_amigavel +
-                                          " não está respondendo. Verifique a conexão.");
+                    enviarMensagemTelegram("🔌❌ SENSOR OFFLINE\n"
+                                          "Placa: " + getNomePlaca() + "\n"
+                                          "Sensor: " + s.nome_amigavel + "\n"
+                                          "Verifique a conexão do cabo.");
                     e.erroAvisado = true;
                 }
             } else if (s.id_sensor < MAX_SENSORES) {
@@ -366,8 +369,10 @@ void processarLogicaAlertas() {
                 EstadoSemHardware& e = semHw[s.id_sensor];
                 e.ciclosErro++;
                 if (e.ciclosErro >= 5 && !e.erroAvisado) {
-                    enviarMensagemTelegram("⚠️ SENSOR OFFLINE: " + s.nome_amigavel +
-                                          " não está respondendo. Verifique a conexão.");
+                    enviarMensagemTelegram("🔌❌ SENSOR OFFLINE\n"
+                                          "Placa: " + getNomePlaca() + "\n"
+                                          "Sensor: " + s.nome_amigavel + "\n"
+                                          "Verifique a conexão do cabo.");
                     e.erroAvisado = true;
                 }
             }
@@ -382,8 +387,10 @@ void processarLogicaAlertas() {
                 if (hw_getID(i) == s.id_fisico) { idx = i; break; }
             }
             if (idx != -1 && estados[idx].erroAvisado) {
-                enviarMensagemTelegram("✅ Sensor reconectado: " + s.nome_amigavel +
-                                      " voltou a responder.");
+                enviarMensagemTelegram("🔌✅ SENSOR RECONECTADO\n"
+                                      "Placa: " + getNomePlaca() + "\n"
+                                      "Sensor: " + s.nome_amigavel + "\n"
+                                      "Voltou a responder normalmente.");
                 estados[idx].ciclosErro  = 0;
                 estados[idx].erroAvisado = false;
             } else if (idx != -1) {
