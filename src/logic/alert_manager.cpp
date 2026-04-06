@@ -108,6 +108,11 @@
 #include "../debug.h"
 #include "../config/system_limits.h"
 #include <time.h>
+#include <Preferences.h>
+
+#define NVS_NAMESPACE_ALERTAS "alert_state"
+
+static Preferences prefsAlerta;
 
 
 // ── INTERVALOS DE REPETIÇÃO ───────────────────────────────────────────────────
@@ -133,12 +138,70 @@ struct EstadoAlerta {
     time_t        inicioCritico      = 0;   // Unix timestamp de quando cruzou o limiar crítico
     bool          criticoAvisado     = false;
     unsigned long ultimoAvisoCritico = 0;
+
+    // Sensor desconectado — conta ciclos consecutivos de erro
+    uint8_t ciclosErro    = 0;     // ciclos consecutivos com SENSOR_ERRO
+    bool    erroAvisado   = false; // true = já avisou sobre desconexão
 };
 
 // Um estado para cada sensor possível — alocado em tempo de compilação
 // static = só existe neste arquivo, não vaza para o restante do projeto
 static EstadoAlerta estados[MAX_SENSORES];
 
+
+// ── FUNÇÕES DE PERSISTÊNCIA NO NVS ────────────────────────────────────────────
+// Salva os 4 campos do estado de alerta de um sensor na NVS
+// Chamada sempre que o estado muda (timer inicia, aviso enviado, timer zera)
+static void salvarEstadoNVS(uint8_t id_sensor, const EstadoAlerta& e) {
+    if (id_sensor == 255) return;  // sensor sem id atribuído — não salva
+    // Monta as chaves como char[] — Preferences só aceita const char*, não String
+    char kIs[6], kSa[6], kIc[6], kCa[6];
+    snprintf(kIs, sizeof(kIs), "is_%d", id_sensor);
+    snprintf(kSa, sizeof(kSa), "sa_%d", id_sensor);
+    snprintf(kIc, sizeof(kIc), "ic_%d", id_sensor);
+    snprintf(kCa, sizeof(kCa), "ca_%d", id_sensor);
+    prefsAlerta.begin(NVS_NAMESPACE_ALERTAS, false);
+    prefsAlerta.putLong(kIs, (long)e.inicioSuave);
+    prefsAlerta.putBool(kSa, e.suaveAvisado);
+    prefsAlerta.putLong(kIc, (long)e.inicioCritico);
+    prefsAlerta.putBool(kCa, e.criticoAvisado);
+    prefsAlerta.end();
+}
+
+// Carrega do NVS os estados salvos antes do restart — chamada uma vez no boot
+void alert_carregarEstados() {
+    prefsAlerta.begin(NVS_NAMESPACE_ALERTAS, true);  // true = somente leitura
+    auto cadastrados = registry_getTodos();
+
+    for (const auto& s : cadastrados) {
+        if (s.id_sensor == 255) continue;  // sem id — pula
+
+        // Localiza o índice de hardware deste sensor
+        int idx = -1;
+        for (int i = 0; i < hw_getContagem(); i++) {
+            if (hw_getID(i) == s.id_fisico) { idx = i; break; }
+        }
+        if (idx == -1) continue;  // sensor não encontrado no hardware
+
+        EstadoAlerta& e = estados[idx];
+        char kIs[6], kSa[6], kIc[6], kCa[6];
+        snprintf(kIs, sizeof(kIs), "is_%d", s.id_sensor);
+        snprintf(kSa, sizeof(kSa), "sa_%d", s.id_sensor);
+        snprintf(kIc, sizeof(kIc), "ic_%d", s.id_sensor);
+        snprintf(kCa, sizeof(kCa), "ca_%d", s.id_sensor);
+        e.inicioSuave    = (time_t)prefsAlerta.getLong(kIs, 0);
+        e.suaveAvisado   =         prefsAlerta.getBool(kSa, false);
+        e.inicioCritico  = (time_t)prefsAlerta.getLong(kIc, 0);
+        e.criticoAvisado =         prefsAlerta.getBool(kCa, false);
+
+        if (e.inicioSuave > 0 || e.inicioCritico > 0) {
+            LOG("Estado restaurado: " + s.nome_amigavel +
+                " | suave=" + String((long)e.inicioSuave) +
+                " | critico=" + String((long)e.inicioCritico));
+        }
+    }
+    prefsAlerta.end();
+}
 
 // ── FUNÇÕES AUXILIARES DE RESET ───────────────────────────────────────────────
 // Centraliza o reset para não repetir as mesmas linhas em vários lugares
@@ -192,8 +255,10 @@ bool estaNoHorarioDeMonitoramento(const SensorConfig& s) {
 void alert_setModoManutencao(const String& id_fisico, uint8_t horas) {
     SensorConfig s;
     if (registry_buscarPorID(id_fisico, s)) {
-        // millis() + horas em ms = timestamp de quando o silêncio termina
-        s.mudo_ate = millis() + ((unsigned long)horas * 3600000UL);
+        // Unix timestamp de quando o silêncio termina
+        time_t agora;
+        time(&agora);
+        s.mudo_ate = agora + ((time_t)horas * 3600);
         registry_salvar(s);
         LOG("Alerta: " + s.nome_amigavel + " silenciado por " + String(horas) + "h");
     }
@@ -222,9 +287,9 @@ void processarLogicaAlertas() {
         // ── 2. Modo manutenção (mudo) ─────────────────────────────────────
         // mudo_ate > 0 significa que está silenciado até aquele timestamp
         if (s.mudo_ate > 0) {
-            // Subtração com unsigned long funciona corretamente mesmo após overflow
-            // do millis() em ~49 dias — nunca comparar diretamente
-            if ((long)(millis() - s.mudo_ate) < 0) continue;  // ainda em manutenção
+            time_t agora;
+            time(&agora);
+            if (agora < s.mudo_ate) continue;  // ainda em manutenção
             else {
                 // Tempo de manutenção acabou — libera o sensor
                 SensorConfig s_upd = s;
@@ -261,7 +326,41 @@ void processarLogicaAlertas() {
 
         // ── 4. Lê temperatura ─────────────────────────────────────────────
         float temp = hw_getTemp(s.id_fisico);
-        if (temp == DEVICE_DISCONNECTED_C) continue;  // sensor offline — pula
+
+        if (temp == DEVICE_DISCONNECTED_C) {
+            // Busca idx para acessar o estado deste sensor
+            int idx = -1;
+            for (int i = 0; i < hw_getContagem(); i++) {
+                if (hw_getID(i) == s.id_fisico) { idx = i; break; }
+            }
+            if (idx != -1) {
+                EstadoAlerta& e = estados[idx];
+                e.ciclosErro++;
+                // Avisa após 5 ciclos consecutivos (10 min) — uma única vez
+                if (e.ciclosErro >= 5 && !e.erroAvisado) {
+                    enviarMensagemTelegram("⚠️ SENSOR OFFLINE: " + s.nome_amigavel +
+                                          " não está respondendo. Verifique a conexão.");
+                    e.erroAvisado = true;
+                }
+            }
+            continue;  // sensor offline — não processa alertas de temperatura
+        }
+
+        // Sensor voltou a responder — avisa recuperação se estava com erro
+        {
+            int idx = -1;
+            for (int i = 0; i < hw_getContagem(); i++) {
+                if (hw_getID(i) == s.id_fisico) { idx = i; break; }
+            }
+            if (idx != -1 && estados[idx].erroAvisado) {
+                enviarMensagemTelegram("✅ Sensor reconectado: " + s.nome_amigavel +
+                                      " voltou a responder.");
+                estados[idx].ciclosErro  = 0;
+                estados[idx].erroAvisado = false;
+            } else if (idx != -1) {
+                estados[idx].ciclosErro = 0;  // reseta contador mesmo sem ter avisado
+            }
+        }
 
         // ── 5. Busca o índice do sensor na lista de hardware ──────────────
         // Precisamos do índice para acessar estados[idx]
@@ -286,6 +385,7 @@ void processarLogicaAlertas() {
             // Primeira vez acima do crítico — anota o horário
             if (e.inicioCritico == 0) {
                 time(&e.inicioCritico);
+                salvarEstadoNVS(s.id_sensor, e);
                 LOG("Timer crítico iniciado: " + s.nome_amigavel + " " + String(temp, 1) + "°C");
             }
 
@@ -305,6 +405,7 @@ void processarLogicaAlertas() {
                                        " está em " + String(temp, 1) + "°C!");
                 e.criticoAvisado     = true;
                 e.ultimoAvisoCritico = millis();
+                salvarEstadoNVS(s.id_sensor, e);
             }
             else if ((millis() - e.ultimoAvisoCritico) >= REPETICAO_CRITICO_S * 1000UL) {
                 // Repetição — problema não foi resolvido, insiste no aviso
@@ -333,6 +434,7 @@ void processarLogicaAlertas() {
                 enviarMensagemTelegram(msg);
             }
             resetarCritico(e);
+            salvarEstadoNVS(s.id_sensor, e);
             // Nota: o timer suave continua rodando normalmente
             // Se estava acima do suave antes de entrar no crítico, o tempo já está contando
         }
@@ -348,6 +450,7 @@ void processarLogicaAlertas() {
             // Primeira vez acima do limiar suave — anota o horário
             if (e.inicioSuave == 0) {
                 time(&e.inicioSuave);
+                salvarEstadoNVS(s.id_sensor, e);
                 LOG("Timer suave iniciado: " + s.nome_amigavel + " " + String(temp, 1) + "°C");
             }
 
@@ -368,6 +471,7 @@ void processarLogicaAlertas() {
                                        String(s.tempo_degelo_min) + " min!");
                 e.suaveAvisado     = true;
                 e.ultimoAvisoSuave = millis();
+                salvarEstadoNVS(s.id_sensor, e);
             }
             else if ((millis() - e.ultimoAvisoSuave) >= REPETICAO_SUAVE_S * 1000UL) {
                 // Repetição — problema persiste, insiste no aviso
@@ -394,5 +498,6 @@ void processarLogicaAlertas() {
         // Zera tudo — pronto para o próximo ciclo de monitoramento
         resetarSuave(e);
         resetarCritico(e);  // reseta também o crítico, caso tenha sido passageiro sem aviso
+        salvarEstadoNVS(s.id_sensor, e);
     }
 }

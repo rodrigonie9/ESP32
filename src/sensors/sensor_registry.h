@@ -2,9 +2,9 @@
 
 #pragma once
 
-
 #include <Arduino.h>
-#include <vector>            
+#include <vector>
+#include <time.h>            
 // vector usar memória ram da ESP32
 // std::vector salva sensorescadastrados na RAM (lista dinâmica)
 // usa com frequencia &, para usar referência com a memória RAM
@@ -35,7 +35,7 @@ struct SensorConfig {
     float temp_critica;                 // Limite grave
     uint16_t tempo_espera_critico_min;  // Tempo de paciência antes de avisar crítico
     bool monitoramento_ativo;       // Monitoramento ligado / desligado
-    unsigned long mudo_ate;         // Timestamp para modo manutenção (0 = normal)
+    time_t mudo_ate;                // Unix timestamp até quando está em manutenção (0 = normal)
     uint8_t horas_mudo_padrao;      // Duração botão de silencio (1h, 2h,....24h)
 
 // ── AGENDA POR DIA// ──────────────────────────────────────────

@@ -1,5 +1,6 @@
 # include <WebServer.h>
 # include <WiFi.h>
+#include <time.h>
 
 #include "web_portal.h"
 #include "device/device_config.h"  // informações da placa esp32
@@ -53,8 +54,12 @@ tr:hover td{background:#f9fafb;}
 /* ── ID compacto: pequeno por padrão, expande ao passar o mouse ──
    max-width pequeno faz o texto ser cortado com "..."
    ao passar o mouse, max-width aumenta suavemente (transition) */
-.id-chip{display:inline-block;max-width:52px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-family:monospace;font-size:0.75em;background:#f3f4f6;padding:2px 6px;border-radius:4px;cursor:default;transition:max-width 0.35s ease;vertical-align:middle;}
+.id-chip{display:inline-block;max-width:52px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-family:monospace;font-size:0.9em;background:#f3f4f6;padding:2px 6px;border-radius:4px;cursor:default;transition:max-width 0.35s ease;vertical-align:middle;}
 .id-chip:hover{max-width:240px;}
+
+/* ── Linha de sensor desconectado ── */
+.sensor-offline td{background:#fee2e2;}
+.sensor-offline:hover td{background:#fecaca;}
 
 /* ── Formulários ── */
 input[type=text],input[type=number],select{padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.9em;}
@@ -109,10 +114,31 @@ void handleRoot() {
         strftime(horaAtual, sizeof(horaAtual), "%H:%M:%S  %d/%m/%Y", &timeinfo);
     }
 
+    // Formata hora do boot (quando a placa iniciou)
+    char horaBoot[24] = "desconhecida";
+    time_t tBoot = sysinfo_getBootTime();
+    if (tBoot != 0) {
+        struct tm tmBoot;
+        localtime_r(&tBoot, &tmBoot);
+        strftime(horaBoot, sizeof(horaBoot), "%H:%M  %d/%m/%Y", &tmBoot);
+    }
+
+    // Formata hora do último reboot programado
+    char horaReboot[24] = "nunca";
+    time_t tReboot = sysinfo_getUltimoRebootProgramado();
+    if (tReboot != 0) {
+        struct tm tmReboot;
+        localtime_r(&tReboot, &tmReboot);
+        strftime(horaReboot, sizeof(horaReboot), "%H:%M  %d/%m/%Y", &tmReboot);
+    }
+
     server.sendContent("<div class='topo'><h1>" + getNomePlaca() + "</h1>"
                        "<small>Monitor de Temperatura &bull; ESP32</small>"
                        "<small style='display:block;margin-top:6px;opacity:0.85'>"
-                       "Hora da placa: " + String(horaAtual) + "</small></div>");
+                       "Hora atual: " + String(horaAtual) + "</small>"
+                       "<small style='display:block;opacity:0.75'>"
+                       "Iniciou em: " + String(horaBoot) + " &bull; "
+                       "Reboot programado: " + String(horaReboot) + "</small></div>");
 
     // --- SEÇÃO 1: CONFIGURAÇÃO DO NOME DA PLACA ---
     String cardPlaca = "<div class='card'><h2>Configuração da Placa</h2>";
@@ -131,19 +157,23 @@ void handleRoot() {
         float temp     = hw_getTemp(s.id_fisico);
         SensorStats st = hw_getStats(s.id_fisico); // contém ultimo_timestamp
 
-        // ── Coluna NOME + badge de manutenção ──
-        // O badge laranja aparece só enquanto o modo manutenção está ativo
+        // ── Coluna NOME + badge de manutenção com hora de término ──
         String nomeCell = s.nome_amigavel;
-        if (s.mudo_ate > 0 && (long)(millis() - s.mudo_ate) < 0) {
-            // (long)(millis() - mudo_ate) < 0 → o tempo ainda não passou
-            nomeCell += " <span class='badge bmaint'>Manutenção</span>";
+        time_t agora; time(&agora);
+        bool emManutencao = (s.mudo_ate > 0 && agora < s.mudo_ate);
+        if (emManutencao) {
+            struct tm tmMudo;
+            localtime_r(&s.mudo_ate, &tmMudo);
+            char ate[6];  // "HH:MM\0"
+            strftime(ate, sizeof(ate), "%H:%M", &tmMudo);
+            nomeCell += " <span class='badge bmaint'>Manutenção até " + String(ate) + "</span>";
         }
 
         // ── Coluna TEMPERATURA com cor por status ──
         // Verde = normal | Laranja = acima do alerta | Vermelho = crítico ou sensor OFF
         String tempCell;
         if (temp == SENSOR_ERRO) {
-            tempCell = "<span class='tcrit'>OFF</span>";
+            tempCell = "<span class='tcrit'>DESCONECTADO</span>";
         } else if (temp >= s.temp_critica) {
             // Temperatura acima do limite crítico — aviso imediato
             tempCell = "<span class='tcrit'>" + String(temp, 1) + "&deg;C</span>";
@@ -170,7 +200,8 @@ void handleRoot() {
         }
 
         // ── Envia as células na nova ordem ──
-        server.sendContent("<tr>");
+        bool desconectado = (temp == SENSOR_ERRO);
+        server.sendContent(desconectado ? "<tr class='sensor-offline'>" : "<tr>");
         server.sendContent("<td>" + nomeCell + "</td>");
         server.sendContent("<td>" + tempCell + "</td>");
         server.sendContent("<td>" + horaCell + "</td>");
@@ -180,24 +211,27 @@ void handleRoot() {
         server.sendContent("<td>");
         server.sendContent("<a href='/editar?id=" + s.id_fisico + "' class='btn btn-primary'>Editar</a> ");
 
-        // Formulário de manutenção: select de horas + botão — tudo numa linha (display:inline)
-        server.sendContent("<form action='/manutencao' method='POST' style='display:inline'>");
-        server.sendContent("<input type='hidden' name='id' value='" + s.id_fisico + "'>");
-        server.sendContent("<select name='horas' style='padding:3px;font-size:0.8em'>");
-        for (int h = 1; h <= 24; h++) {
-            server.sendContent("<option value='" + String(h) + "'>" + String(h) + "h</option>");
+        // Botão manutenção — vira "Cancelar" se já estiver em manutenção
+        if (emManutencao) {
+            server.sendContent("<form action='/cancelar_manutencao' method='POST' style='display:inline'>");
+            server.sendContent("<input type='hidden' name='id' value='" + s.id_fisico + "'>");
+            server.sendContent("<button type='submit' class='btn btn-warning'>Cancelar Manutenção</button></form> ");
+        } else {
+            server.sendContent("<form action='/manutencao' method='POST' style='display:inline'>");
+            server.sendContent("<input type='hidden' name='id' value='" + s.id_fisico + "'>");
+            server.sendContent("<select name='horas' style='padding:3px;font-size:0.8em'>");
+            for (int h = 1; h <= 24; h++) {
+                server.sendContent("<option value='" + String(h) + "'>" + String(h) + "h</option>");
+            }
+            server.sendContent("</select> ");
+            server.sendContent("<button type='submit' class='btn btn-warning'>Manutenção</button></form> ");
         }
-        server.sendContent("</select> ");
-        server.sendContent("<button type='submit' class='btn btn-warning'>Manutenção</button></form> ");
         server.sendContent("<a href='/remover?id=" + s.id_fisico + "' class='btn btn-danger'>Remover</a>");
         server.sendContent("</td>");
 
-        // ── Coluna ID — pequeno com hover para expandir ──
-        // .id-chip → max-width curto, texto cortado com "..."
-        // .id-chip:hover → max-width aumenta suavemente (CSS transition)
-        // title='' → tooltip nativo do navegador com o ID completo
+        // ── Coluna ID — exibe id_sensor (0-29), tooltip mostra id_fisico completo ──
         server.sendContent("<td><span class='id-chip' title='" + s.id_fisico + "'>"
-                           + s.id_fisico + "</span></td>");
+                           + String(s.id_sensor) + "</span></td>");
         server.sendContent("</tr>");
     }
     server.sendContent("</table></div>");
@@ -498,6 +532,19 @@ void handleRemoverSensor() {
     server.send(303);
 }
 
+// Cancela o modo manutenção — zera mudo_ate e salva na NVS
+void handleCancelarManutencao() {
+    if (server.hasArg("id")) {
+        SensorConfig s;
+        if (registry_buscarPorID(server.arg("id"), s)) {
+            s.mudo_ate = 0;
+            registry_salvar(s);
+        }
+    }
+    server.sendHeader("Location", "/");
+    server.send(303);
+}
+
 // Botão de manutenção — silencia alertas por X horas sem alterar a agenda
 void handleManutencao() {
     if (server.hasArg("id") && server.hasArg("horas")) {
@@ -517,7 +564,8 @@ void iniciarWebPortal() {
     server.on("/config/sensor", HTTP_POST, handleConfigSensor);
     server.on("/editar",        HTTP_GET,  handleEditarSensor);  // página de edição
     server.on("/salvar/sensor", HTTP_POST, handleSalvarEdicao);  // salva edição
-    server.on("/manutencao",    HTTP_POST, handleManutencao);    // botão manutenção
+    server.on("/manutencao",           HTTP_POST, handleManutencao);          // ativa manutenção
+    server.on("/cancelar_manutencao",  HTTP_POST, handleCancelarManutencao);  // cancela manutenção
     server.on("/remover",                  handleRemoverSensor);
     server.begin();
     LOG("Servidor Web iniciado.");

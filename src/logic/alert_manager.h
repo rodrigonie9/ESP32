@@ -5,6 +5,10 @@
 // Função que será chamada no loop principal (main.cpp)
 void processarLogicaAlertas();
 
+// Carrega do NVS os estados de alerta salvos antes do último restart
+// Deve ser chamada no setup(), após registry_iniciar() e hw_iniciar()
+void alert_carregarEstados();
+
 // Função para colocar um sensor em modo manutenção (mudo) por X horas
 void alert_setModoManutencao(const String& id_fisico, uint8_t horas);
 

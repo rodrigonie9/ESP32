@@ -46,6 +46,7 @@ static void gravarNoNVS(){
         obj["temp_critica"]             = s.temp_critica;
         obj["tempo_espera_critico_min"] = s.tempo_espera_critico_min;
         obj["monitoramento_ativo"]  = s.monitoramento_ativo;
+        obj["mudo_ate"]             = (long)s.mudo_ate;
         obj["horas_mudo_padrao"]    = s.horas_mudo_padrao;
         
         // ── AGENDA POR DIA ──
@@ -103,7 +104,8 @@ void registry_iniciar () {
             s.temp_critica              = obj["temp_critica"].as<float>();
             s.tempo_espera_critico_min  = obj["tempo_espera_critico_min"].as<uint16_t>();
             s.monitoramento_ativo = obj["monitoramento_ativo"].as<bool>();
-            s.horas_mudo_padrao = obj["horas_mudo_padrao"].as<uint8_t>();
+            s.mudo_ate            = (time_t)obj["mudo_ate"].as<long>();  // 0 = não está em manutenção
+            s.horas_mudo_padrao   = obj["horas_mudo_padrao"].as<uint8_t>();
             
     
             // ── AGENDA POR DIA ──
@@ -126,29 +128,8 @@ void registry_iniciar () {
               }
             
 
-            s.mudo_ate = 0; // Reset do modo mudo ao reiniciar
             sensoresCadastrados.push_back(s);
-        }
-
-        // ── ATRIBUIÇÃO DE IDs NO BOOT ──────────────────────────────────────
-        // Sensores migrados de versões antigas chegam com id_sensor = 255
-        // Percorre a lista e atribui o menor id disponível para quem ainda não tem
-        bool algumSemId = false;
-        for (auto& s : sensoresCadastrados) {
-            if (s.id_sensor != 255) continue;  // já tem id — pula
-            algumSemId = true;
-            for (int i = 0; i < MAX_SENSORES; i++) {
-                bool emUso = false;
-                for (const auto& outro : sensoresCadastrados) {
-                    if (outro.id_sensor == i) { emUso = true; break; }
-                }
-                if (!emUso) { s.id_sensor = i; break; }
-            }
-            LOG("ID atribuído: " + s.nome_amigavel + " → id_sensor=" + String(s.id_sensor));
-        }
-        // Se algum sensor recebeu id novo, persiste imediatamente na NVS
-        if (algumSemId) gravarNoNVS();
-
+        } 
         LOG("Registry: " + String(sensoresCadastrados.size()) + " sensores.");
 
     } else {

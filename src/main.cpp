@@ -99,6 +99,9 @@ void setup() {
   if(tentativas < 20) {
     LOG("NTP sincronizado com sucesso");
     horaEstaSincronizada = true;
+    time_t agora;
+    time(&agora);
+    sysinfo_setBootTime(agora);  // registra hora do boot para exibir no web portal
   } else {
     LOG("NTP falhou - continuando sem hora sincronizada");
     // sem NTP as agendas não funcionam - avisa o usuário via telegram
@@ -133,6 +136,8 @@ void setup() {
   hw_iniciar();      //hardware
   LOG("Sensore detectados: ");
   LOG(hw_getContagem());
+
+  alert_carregarEstados();  // restaura timers de alerta salvos antes do restart
 
 
 
@@ -238,16 +243,28 @@ void loop() {
     }
   }
 
-  // Reboot diário às 03:00 - limpa heap fragmentado, reset wi-fo preso
-  // grante nova sincronização NTP todos os dias
-  // só executa se a hora estiver sincronizada, evita reeboot em hora errada
-  if (horaEstaSincronizada){
+  // Reboot diário às 12:00 - limpa heap fragmentado, reseta wi-fi preso,
+  // garante nova sincronização NTP. Só executa uma vez por dia.
+  if (horaEstaSincronizada) {
     struct tm timeinfo;
-    if (getLocalTime(&timeinfo)) {
-      if (timeinfo.tm_hour == 3 && timeinfo.tm_min == 0){
+    if (getLocalTime(&timeinfo) && timeinfo.tm_hour == 12 && timeinfo.tm_min == 0) {
+
+      // Verifica se já reiniciou hoje — evita múltiplos reboots no mesmo minuto
+      struct tm ultimoTm;
+      time_t ultimoReboot = sysinfo_getUltimoRebootProgramado();
+      localtime_r(&ultimoReboot, &ultimoTm);
+
+      bool jaReiniciouHoje = (ultimoReboot != 0 &&
+                              ultimoTm.tm_mday == timeinfo.tm_mday &&
+                              ultimoTm.tm_mon  == timeinfo.tm_mon  &&
+                              ultimoTm.tm_year == timeinfo.tm_year);
+
+      if (!jaReiniciouHoje) {
+        time_t agora;
+        time(&agora);
+        sysinfo_salvarRebootProgramado(agora);  // salva para web portal + evitar loop
         LOG("Reboot diário programado - reiniciando");
-        enviarMensagemTelegram("Reboot diário programado. Voltando em instantes.");
-        delay(500);
+        delay(200);
         ESP.restart();
       }
     }

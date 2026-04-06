@@ -38,8 +38,9 @@
   // Retorna "MANUT", "ON" ou "OFF"
   static const char* getStatusMonitoramento(const SensorConfig& s) {
       // Verifica modo manutenção — mesma lógica do web portal
-      // (long)(millis() - mudo_ate) < 0 = o tempo ainda não acabou
-      if (s.mudo_ate > 0 && (long)(millis() - s.mudo_ate) < 0) {
+      // compara Unix timestamp — se agora < mudo_ate, ainda está em manutenção
+      time_t agora; time(&agora);
+      if (s.mudo_ate > 0 && agora < s.mudo_ate) {
           return "MANUT";
       }
       // Usa a função do alert_manager — lógica centralizada num só lugar

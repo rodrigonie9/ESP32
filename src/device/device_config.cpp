@@ -1,12 +1,17 @@
 #include <Arduino.h>          // Necessário para ESP.getEfuseMac()
 #include "device_config.h"
 #include <Preferences.h>
+#include <time.h>
 
 // Objeto responsável por acessar a NVS (flash interna)
 static Preferences prefsDevice;
 
 // Variável em RAM que guarda o nome da placa
 static String nomePlaca;
+
+// Timestamps de sistema — ficam na RAM, bootTime é definido após NTP sincronizar
+static time_t bootTime             = 0;  // momento em que a placa iniciou
+static time_t ultimoRebootProgramado = 0; // último reboot programado (carregado da NVS no boot)
 
 // ================= FUNÇÕES INTERNAS ===================
 
@@ -55,6 +60,10 @@ void iniciarDeviceConfig() {
         prefsDevice.putString(DEVICE_KEY_NOME_PLACA, nomePlaca);
     }
 
+    // Carrega o último reboot programado salvo na NVS
+    // getLong retorna 0 se a chave não existir — nunca reiniciou programado ainda
+    ultimoRebootProgramado = (time_t)prefsDevice.getLong(DEVICE_KEY_ULTIMO_REBOOT, 0);
+
     // Fecha a NVS
     prefsDevice.end();
 }
@@ -83,4 +92,25 @@ void setNomePlaca(const String& novoNome) {
 
     // Atualiza variável em RAM
     nomePlaca = novoNome;
+}
+
+// ── SYSINFO ───────────────────────────────────────────────────────────────────
+
+void sysinfo_setBootTime(time_t t) {
+    bootTime = t;  // chamado uma vez no setup(), após NTP sincronizar
+}
+
+time_t sysinfo_getBootTime() {
+    return bootTime;
+}
+
+void sysinfo_salvarRebootProgramado(time_t t) {
+    ultimoRebootProgramado = t;
+    prefsDevice.begin(DEVICE_NVS_NAMESPACE, false);
+    prefsDevice.putLong(DEVICE_KEY_ULTIMO_REBOOT, (long)t);
+    prefsDevice.end();
+}
+
+time_t sysinfo_getUltimoRebootProgramado() {
+    return ultimoRebootProgramado;
 }
