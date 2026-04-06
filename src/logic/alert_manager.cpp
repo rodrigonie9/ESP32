@@ -148,6 +148,18 @@ struct EstadoAlerta {
 // static = só existe neste arquivo, não vaza para o restante do projeto
 static EstadoAlerta estados[MAX_SENSORES];
 
+// ── ESTADO DE ERRO PARA SENSORES SEM HARDWARE ─────────────────────────────────
+// Usado quando o sensor está cadastrado no NVS mas NÃO foi detectado no barramento
+// no boot (por exemplo: cabo queimado antes do reboot, sensor trocado sem reboot).
+// Indexado por id_sensor (0-29) — independente do índice de hardware (hw_idx).
+// NÃO pode usar estados[hw_idx] porque o sensor não tem posição no mapa de hardware
+// e usar estados[id_sensor] causaria conflito com outro sensor que esteja naquela posição.
+struct EstadoSemHardware {
+    uint8_t ciclosErro  = 0;    // quantos ciclos consecutivos retornaram DEVICE_DISCONNECTED_C
+    bool    erroAvisado = false; // true = Telegram já foi avisado, não repete
+};
+static EstadoSemHardware semHw[MAX_SENSORES];
+
 
 // ── FUNÇÕES DE PERSISTÊNCIA NO NVS ────────────────────────────────────────────
 // Salva os 4 campos do estado de alerta de um sensor na NVS
@@ -328,21 +340,38 @@ void processarLogicaAlertas() {
         float temp = hw_getTemp(s.id_fisico);
 
         if (temp == DEVICE_DISCONNECTED_C) {
-            // Busca idx para acessar o estado deste sensor
+            // Busca o índice de hardware do sensor (posição no mapa do barramento físico)
             int idx = -1;
             for (int i = 0; i < hw_getContagem(); i++) {
                 if (hw_getID(i) == s.id_fisico) { idx = i; break; }
             }
+
             if (idx != -1) {
+                // ── Caso normal: sensor estava no barramento no boot, agora está falhando ──
+                // A cada ciclo de erro incrementa o contador.
+                // Depois de 5 ciclos consecutivos (= 10 min), avisa uma única vez.
                 EstadoAlerta& e = estados[idx];
                 e.ciclosErro++;
-                // Avisa após 5 ciclos consecutivos (10 min) — uma única vez
+                if (e.ciclosErro >= 5 && !e.erroAvisado) {
+                    enviarMensagemTelegram("⚠️ SENSOR OFFLINE: " + s.nome_amigavel +
+                                          " não está respondendo. Verifique a conexão.");
+                    e.erroAvisado = true;
+                }
+            } else if (s.id_sensor < MAX_SENSORES) {
+                // ── Caso especial: sensor cadastrado mas NÃO estava no barramento no boot ──
+                // (ex: cabo queimado antes do reboot — nunca entrou no mapa de hardware)
+                // Não pode usar estados[hw_idx] pois não existe hw_idx para este sensor.
+                // Usa semHw[id_sensor], array separado, para evitar conflito com outros sensores
+                // que ocupam aquela posição no mapa de hardware.
+                EstadoSemHardware& e = semHw[s.id_sensor];
+                e.ciclosErro++;
                 if (e.ciclosErro >= 5 && !e.erroAvisado) {
                     enviarMensagemTelegram("⚠️ SENSOR OFFLINE: " + s.nome_amigavel +
                                           " não está respondendo. Verifique a conexão.");
                     e.erroAvisado = true;
                 }
             }
+
             continue;  // sensor offline — não processa alertas de temperatura
         }
 

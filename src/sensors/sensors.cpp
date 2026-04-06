@@ -98,6 +98,8 @@ void hw_lerTodos(){
     if (temp == DEVICE_DISCONNECTED_C) {
       stats[i].leituras_erro++;
       stats[i].ultimo_erro = true;
+      ultimaTemperatura[i] = SENSOR_ERRO;  // reseta para que hw_getTemp() reflita o erro
+                                            // sem isso, retornaria a última leitura boa
     } else {
       stats[i].leituras_ok++;
       stats[i].ultimo_erro = false;

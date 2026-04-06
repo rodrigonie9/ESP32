@@ -457,6 +457,28 @@ void handleSalvarEdicao() {
         }
     }
 
+    // ── Verifica se outro sensor já usa este nome (permite manter o mesmo nome ao editar) ──
+    // Compara contra todos os sensores, mas ignora o próprio sensor (mesmo id_fisico)
+    String idAtual = server.arg("id");
+    auto todos = registry_getTodos();
+    for (const auto& existente : todos) {
+        if (existente.id_fisico != idAtual &&
+            existente.nome_amigavel.equalsIgnoreCase(s.nome_amigavel)) {
+            server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+            server.send(200, "text/html",
+                "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+                "<meta name='viewport' content='width=device-width,initial-scale=1'>");
+            server.sendContent(WEB_STYLE);
+            server.sendContent("</head><body><div class='card'>"
+                "<p style='color:#dc2626;font-weight:bold'>&#10060; Nome j&aacute; em uso</p>"
+                "<p>J&aacute; existe um sensor chamado <b>" + s.nome_amigavel + "</b>. Escolha outro nome.</p>"
+                "<a href='/editar?id=" + idAtual + "' class='btn btn-primary'>Voltar</a>"
+                "</div></body></html>");
+            server.sendContent("");
+            return;
+        }
+    }
+
     registry_salvar(s);
     server.sendHeader("Location", "/");
     server.send(303);
@@ -495,6 +517,27 @@ void handleConfigSensor() {
         // checar o primeiro caractere é a única forma segura de distinguir os dois
         bool tempValida = maxStr.length() > 0 &&
                           (isdigit(maxStr[0]) || maxStr[0] == '-' || maxStr[0] == '.');
+
+        // ── Verifica se o nome já está em uso por outro sensor ──
+        // Comparação sem diferenciar maiúsculas/minúsculas (equalsIgnoreCase)
+        // Ex: "Câmara 1" e "câmara 1" são considerados iguais
+        auto todos = registry_getTodos();
+        for (const auto& existente : todos) {
+            if (existente.nome_amigavel.equalsIgnoreCase(nome)) {
+                server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+                server.send(200, "text/html",
+                    "<!DOCTYPE html><html><head><meta charset='utf-8'>"
+                    "<meta name='viewport' content='width=device-width,initial-scale=1'>");
+                server.sendContent(WEB_STYLE);
+                server.sendContent("</head><body><div class='card'>"
+                    "<p style='color:#dc2626;font-weight:bold'>&#10060; Nome j&aacute; em uso</p>"
+                    "<p>J&aacute; existe um sensor chamado <b>" + nome + "</b>. Escolha outro nome.</p>"
+                    "<a href='/' class='btn btn-primary'>Voltar</a>"
+                    "</div></body></html>");
+                server.sendContent("");
+                return;
+            }
+        }
 
         SensorConfig s;
         s.id_fisico           = server.arg("id");
