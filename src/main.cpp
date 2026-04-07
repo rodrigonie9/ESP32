@@ -270,6 +270,15 @@ void loop() {
     }
   }
 
+  // ====================== WATCHDOG DE INTERNET ======================
+  // Monitora a conectividade e age de forma escalonada se a internet
+  // ficar indisponível por muito tempo:
+  //   0–6 min   → aguarda o auto-reconnect nativo da ESP32
+  //   6 min     → reseta o driver Wi-Fi (limpa estado corrompido)
+  //   12 min    → reinicia a placa completamente
+  // Se a internet voltar a qualquer momento, o ciclo se reseta sozinho.
+  verificarWatchdogInternet();
+
   // pequeno delay para aliviar o cpu
   // permite esp32 processe tarefas internas (wifi stack, FreeRTOS, Wachtdog) sem bloquear por tempo fixo (delay(50))
   // loop roda mais rápido, webPortalLoop mais responsivo
