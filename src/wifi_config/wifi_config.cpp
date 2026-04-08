@@ -5,6 +5,7 @@
 #include <WiFi.h>
 
 #include "wifi_config.h"     // Header deste módulo
+#include "debug.h"           // Macro LOG() — liga/desliga logs pelo debug.h
 
 
 // ============================================================================
@@ -93,6 +94,8 @@ bool temInternet() {
 //
 // static = função privada, só usada dentro deste arquivo
 static void resetarDriverWifi() {
+  LOG("[WiFi] Resetando driver Wi-Fi (WIFI_OFF -> WIFI_STA -> begin)...");
+
   WiFi.mode(WIFI_OFF);  // desliga completamente o rádio Wi-Fi
 
   // Aguarda 1 segundo em fatias para manter watchdog alimentado
@@ -100,6 +103,8 @@ static void resetarDriverWifi() {
 
   WiFi.mode(WIFI_STA);  // liga de volta em modo estação (cliente)
   WiFi.begin();         // reconecta usando credenciais salvas pelo WiFiManager
+
+  LOG("[WiFi] Driver resetado. Aguardando reconexão...");
 }
 
 
@@ -116,6 +121,11 @@ static unsigned long msUltimoInternetOk = 0;
 // Evita que o watchdog dispare durante o boot se a rede demorar a subir.
 static bool internetConfirmadaUmaVez = false;
 
+// Controla o log de "sem internet" para não repetir a cada chamada.
+// internetDisponivel() é chamada por Telegram, Logger e OTA — sem esse
+// controle, a mensagem apareceria 3+ vezes por ciclo no monitor serial.
+static bool logSemInternetJaFeito = false;
+
 // Função única que deve ser usada antes de qualquer acesso à internet.
 // Retorna true se há internet agora, false caso contrário.
 // Não tenta reconectar — deixamos isso para o auto-reconnect da ESP32
@@ -124,9 +134,24 @@ bool internetDisponivel() {
 
   if (temInternet()) {
     // Internet ok — atualiza o timestamp e marca que já funcionou
+    if (!internetConfirmadaUmaVez) {
+      LOG("[WiFi] Internet confirmada pela primeira vez.");
+    }
+    // Se estava sem internet e voltou: loga a recuperação uma vez
+    if (logSemInternetJaFeito) {
+      LOG("[WiFi] Internet voltou — retomando operação normal.");
+      logSemInternetJaFeito = false;
+    }
     msUltimoInternetOk       = millis();
     internetConfirmadaUmaVez = true;
     return true;
+  }
+
+  // Sem internet — loga apenas na primeira detecção para não poluir o monitor.
+  // As próximas chamadas no mesmo ciclo (Telegram, Logger, OTA) ficam em silêncio.
+  if (!logSemInternetJaFeito) {
+    LOG("[WiFi] Sem internet. Aguardando auto-reconnect...");
+    logSemInternetJaFeito = true;
   }
 
   // Sem internet — retorna false sem forçar disconnect/reconnect.
@@ -186,6 +211,7 @@ void verificarWatchdogInternet() {
   // ── FASE 1: 6 minutos sem internet ───────────────────────────────────────
   // Auto-reconnect não resolveu. Tenta reset do driver Wi-Fi.
   if (!resetDriverFeito) {
+    LOG("[WATCHDOG] 6 min sem internet. Tentando reset do driver Wi-Fi...");
     resetarDriverWifi();
     resetDriverFeito    = true;
     msResetDriverFeito  = millis();
@@ -197,9 +223,8 @@ void verificarWatchdogInternet() {
   // Se chegou aqui, o reset do driver não resolveu.
   // Única saída garantida: restart completo da placa.
   if (millis() - msResetDriverFeito >= WATCHDOG_FASE2_MS) {
-    // Salva um log antes de reiniciar (Serial — visível pelo monitor serial)
-    Serial.println("[WATCHDOG] Sem internet há 12 min. Reiniciando placa...");
-    delay(200); // tempo para a mensagem serial sair
+    LOG("[WATCHDOG] 12 min sem internet. Reset do driver nao resolveu. Reiniciando placa...");
+    delay(200); // tempo para a mensagem serial sair antes do restart
     ESP.restart();
   }
 
