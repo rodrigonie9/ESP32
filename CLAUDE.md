@@ -39,7 +39,7 @@ Sistema embarcado de monitoramento de múltiplas temperaturas com ESP32.
 
 **Fluxo principal (main.cpp):**
 - A cada 2 minutos: lê sensores + processa alertas + envia log ao Google Sheets
-- Reboot programado às 3h da manhã (salvo no NVS)
+- Reboot programado às 12h (salvo no NVS)
 
 **Alertas:**
 - Dois níveis: suave e crítico
@@ -76,9 +76,9 @@ Antes de escrever qualquer código, verificar mentalmente:
 - ✅ 1.3 Timer crítico — fluxo completo
 - ✅ 1.4 Crítico suprime o suave
 - ✅ 1.5 Timer suave continua quando sai do crítico
-- **⏳ PRÓXIMO: 1.6** — Agenda OFF durante alerta ativo (timers zerados)
-- ⬜ 1.7 Manutenção silencia sem resetar timers
-- ⬜ 1.8 NTP falha → monitora por padrão
+- ✅ 1.6 Agenda OFF durante alerta ativo (timers zerados na RAM e NVS)
+- ✅ 1.7 Manutenção silencia sem resetar timers
+- **⏳ PRÓXIMO: 1.8** — NTP falha → monitora por padrão
 - ⬜ 1.9 Boundary exato no limiar suave
 - ⬜ 1.10 Boundary exato no limiar crítico
 - ⬜ 1.11 Múltiplos sensores em alerta simultâneo

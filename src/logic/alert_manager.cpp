@@ -121,7 +121,7 @@ static Preferences prefsAlerta;
 // UL = unsigned long — necessário para multiplicações grandes sem overflow
 // 60000UL = 1 minuto em milissegundos
 const unsigned long REPETICAO_SUAVE_S   = 30UL * 60UL;  // avisa a cada 30 min se ainda em alerta
-const unsigned long REPETICAO_CRITICO_S = 10UL * 60UL;  // avisa a cada 10 min se ainda crítico
+const unsigned long REPETICAO_CRITICO_S = 1UL * 60UL;  // avisa a cada 10 min se ainda crítico
 
 
 // ── ESTADO DE ALERTA POR SENSOR ───────────────────────────────────────────────
@@ -331,9 +331,27 @@ void processarLogicaAlertas() {
                 if (hw_getID(i) == s.id_fisico) { idx = i; break; }
             }
             if (idx != -1) {
+                                
+                //So salva na NVS se havia algo para zerar — evita escrita desnecessária
+                EstadoAlerta& e = estados[idx];
+                bool timerAtivo = (e.inicioSuave > 0 || e.inicioCritico > 0);
+
+                if (timerAtivo) {
+                    LOG("[Agenda OFF] " + s.nome_amigavel +
+                        " | suave=" + String((long)e.inicioSuave) +
+                        " | critico=" + String((long)e.inicioCritico));
+                }
+
+                // Reseta timers na RAM — isso é o mais importante para evitar avisos errados quando a agenda voltar
                 resetarSuave(estados[idx]);
                 resetarCritico(estados[idx]);
+                    
+                if (timerAtivo) {
+                    salvarEstadoNVS(s.id_sensor, e);
+                    LOG("[Agenda OFF] Timers zerados na RAM e NVS: " + s.nome_amigavel);
+                }
             }
+
             continue;  // pula para o próximo sensor — fora do horário de monitoramento
         }
 

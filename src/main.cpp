@@ -64,7 +64,7 @@ bool horaEstaSincronizada = false;
 
 // ====================== CONTROLE DE TEMPO ======================
 unsigned long ultimoEnvio = 0;              // Guarda o tempo do último envio
-const unsigned long INTERVALO = 120000;      //  
+const unsigned long INTERVALO = 30000;      //  
 
 
 
@@ -86,7 +86,7 @@ void setup() {
 
   // ====================== CONEXÃO WI-FI ========================================
   // O valor -10800 é: -3 horas * 3600 segundos // ajustar fuso
-  configTime(-10800, 0, "pool.ntp.org", "time.nist.gov", "time.google.com");
+  //configTime(-10800, 0, "pool.ntp.org", "time.nist.gov", "time.google.com");
   LOG("Sincronizando hora via NTP...");
   
   //tenta garantir que pegou a hora certa (usa delay, até 5s em 10 tentativas)
