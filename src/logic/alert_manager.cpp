@@ -183,6 +183,22 @@ static void salvarEstadoNVS(uint8_t id_sensor, const EstadoAlerta& e) {
 
 // Carrega do NVS os estados salvos antes do restart — chamada uma vez no boot
 void alert_carregarEstados() {
+
+    // Sem NTP: timestamps do NVS são incompatíveis com o relógio zerado
+    // NTP - segundos desde 01/01/1970
+    // (relógio começa em 0, timestamps salvos são de outra sessão)
+    // Descarta e começa do zero — mais seguro do que disparar alertas errados
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo)) {
+        LOG("[Alertas] Boot sem NTP — timers do NVS descartados");
+        return;  // estados ficam zerados(valor padrão do struct)
+    }
+
+
+
+    // Com NTP: carrega normalmente
+    // ... resto do código existente
+  
     prefsAlerta.begin(NVS_NAMESPACE_ALERTAS, true);  // true = somente leitura
     auto cadastrados = registry_getTodos();
 

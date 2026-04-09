@@ -78,8 +78,8 @@ Antes de escrever qualquer código, verificar mentalmente:
 - ✅ 1.5 Timer suave continua quando sai do crítico
 - ✅ 1.6 Agenda OFF durante alerta ativo (timers zerados na RAM e NVS)
 - ✅ 1.7 Manutenção silencia sem resetar timers
-- **⏳ PRÓXIMO: 1.8** — NTP falha → monitora por padrão
-- ⬜ 1.9 Boundary exato no limiar suave
+- ✅ 1.8 NTP falha → monitora por padrão (timers do NVS descartados, agendas ignoradas)
+- **⏳ PRÓXIMO: 1.9** — Boundary exato no limiar suave
 - ⬜ 1.10 Boundary exato no limiar crítico
 - ⬜ 1.11 Múltiplos sensores em alerta simultâneo
 - ⬜ 1.12 Repetição suave a cada 30 min
