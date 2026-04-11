@@ -22,8 +22,13 @@ static DallasTemperature barramentoB(&oneWireB);
 // Estrutura para saber onde cada sensor está "espetado"
 struct SensorLocalizacao {
   String id;
-  uint8_t barramento;     // 0 para o PINO_A, 1 para o PINO_B
-  uint8_t indice;         // Posição(0,1,2....) dentro daquele pino 
+  uint8_t barramento;         // 0 para o PINO_A, 1 para o PINO_B
+  uint8_t indice;             // Posição no boot — mantido para referência, não usado na leitura
+  DeviceAddress addr;         // Endereço ROM de 8 bytes — gravado de fábrica, único e imutável
+                              // Usado em getTempC(addr) para ler EXATAMENTE este sensor,
+                              // independente de quantos outros estão no barramento agora.
+                              // getTempCByIndex(indice) usava a posição ATUAL — quando um sensor
+                              // desconecta, os demais são re-enumerados e os índices trocam de dono.
 };
 
 static SensorLocalizacao mapa[MAX_SENSORES];    // tabela de tradução
@@ -49,9 +54,14 @@ void hw_iniciar(){
       DeviceAddress addr;
       if (bus.getAddress(addr,i)) {
         char buf[25];
-        snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X", 
+        snprintf(buf, sizeof(buf), "%02X:%02X:%02X:%02X:%02X:%02X:%02X:%02X",
                          addr[0], addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7]);
-        mapa[totalDetectados] = {String(buf), barramentoID, i};
+        mapa[totalDetectados].id         = String(buf);
+        mapa[totalDetectados].barramento = barramentoID;
+        mapa[totalDetectados].indice     = i;
+        memcpy(mapa[totalDetectados].addr, addr, sizeof(DeviceAddress));
+        // memcpy copia os 8 bytes do endereço ROM para dentro do mapa
+        // sem isso, addr sai do escopo ao fim do loop e o dado se perde
         totalDetectados ++; 
       }
     }
@@ -85,14 +95,16 @@ void hw_lerTodos(){
     //   condicao ? valor_se_true : valor_se_false
     DallasTemperature& bus = (mapa[i].barramento == 0) ? barramentoA : barramentoB;
 
-    // 1º tentativa
-    temp = bus.getTempCByIndex(mapa[i].indice);
+    // 1º tentativa — lê pelo endereço ROM fixo, não pela posição atual no barramento
+    // getTempC(addr) garante que lemos ESTE sensor específico, mesmo que outros tenham
+    // desconectado e o barramento tenha re-enumerado os índices
+    temp = bus.getTempC(mapa[i].addr);
 
-    // 2º tentatica em caso de erro
+    // 2º tentativa em caso de erro
     if (temp == DEVICE_DISCONNECTED_C) {
-      yield();   //pequena pausa sem usar delay() 
+      yield();   // pequena pausa sem usar delay()
       bus.requestTemperatures();
-      temp = bus.getTempCByIndex(mapa[i].indice);
+      temp = bus.getTempC(mapa[i].addr);
     }
 
     if (temp == DEVICE_DISCONNECTED_C) {

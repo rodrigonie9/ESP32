@@ -319,6 +319,9 @@ void processarLogicaAlertas() {
             time_t agora;
             time(&agora);
             if (agora < s.mudo_ate) continue;  // ainda em manutenção
+            // DECISÃO DE DESIGN: manutenção silencia TUDO — incluindo alertas de hardware offline.
+            // Motivo: se o usuário ativou manutenção, provavelmente está com o sensor na mão.
+            // Aviso de "SENSOR OFFLINE" nesse momento seria um falso alarme desnecessário.
             else {
                 // Tempo de manutenção acabou — libera o sensor
                 SensorConfig s_upd = s;
@@ -328,6 +331,11 @@ void processarLogicaAlertas() {
         }
 
         // ── 3. Fora da agenda ─────────────────────────────────────────────
+        // DECISÃO DE DESIGN: agenda OFF silencia TUDO — incluindo alertas de hardware offline.
+        // Motivo: fora do horário não há equipe disponível para agir (ex: madrugada, fim de semana).
+        // Um cabo quebrado às 3h ou no sábado não pode ser resolvido — aviso seria ruído sem utilidade.
+        // Quando a agenda reativar, se o sensor ainda estiver offline, o ciclo de 5 erros recomeça
+        // e o aviso é enviado normalmente — momento em que alguém pode agir.
         if (!estaNoHorarioDeMonitoramento(s)) {
 
             // Por que zerar os timers aqui?
@@ -405,6 +413,12 @@ void processarLogicaAlertas() {
                 // Não pode usar estados[hw_idx] pois não existe hw_idx para este sensor.
                 // Usa semHw[id_sensor], array separado, para evitar conflito com outros sensores
                 // que ocupam aquela posição no mapa de hardware.
+                //
+                // LIMITAÇÃO CONHECIDA: reconectar o cabo durante a operação NÃO resolve.
+                // O mapa de hardware é construído UMA VEZ no boot (hw_iniciar).
+                // Se o sensor não estava lá no boot, ele não entra no mapa mesmo que
+                // seja reconectado depois. Solução: reiniciar a placa com o sensor conectado.
+                // Um comando /reboot pelo Telegram seria útil aqui — ver melhoria planejada.
                 EstadoSemHardware& e = semHw[s.id_sensor];
                 e.ciclosErro++;
                 if (e.ciclosErro >= 5 && !e.erroAvisado) {
