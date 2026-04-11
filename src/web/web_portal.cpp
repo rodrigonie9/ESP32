@@ -301,13 +301,6 @@ void handleEditarSensor() {
                        "&nbsp;&nbsp; Tempo de espera: <input type='number' name='espera_critico' value='" + String(s.tempo_espera_critico_min) + "' min='0' max='999' style='width:60px'> min"
                        " <small style='color:#888'>Temperatura grave. Avisa após este tempo. Repete enquanto persistir.</small></div>");
 
-    // ── Duração padrão do botão Manutenção
-    server.sendContent("<div class='campo'>Silenciar por: <select name='horas_mudo'>");
-    for (int h = 1; h <= 24; h++) {
-        // (s.horas_mudo_padrao == h ? " selected" : "") marca a opção salva
-        server.sendContent("<option value='" + String(h) + "'" + (s.horas_mudo_padrao == h ? " selected" : "") + ">" + String(h) + "h</option>");
-    }
-    server.sendContent("</select> <small style='color:#888'>(duração padrão do botão Manutenção)</small></div>");
 
     // ── Agenda por dia ──
     // Tabela com 7 linhas — uma por dia da semana
@@ -427,7 +420,6 @@ void handleSalvarEdicao() {
     // ── Tempos de alerta e mudo padrão
     if (server.hasArg("degelo"))        s.tempo_degelo_min         = (uint16_t)server.arg("degelo").toInt();
     if (server.hasArg("espera_critico")) s.tempo_espera_critico_min = (uint16_t)server.arg("espera_critico").toInt();
-    if (server.hasArg("horas_mudo"))    s.horas_mudo_padrao        = (uint8_t)server.arg("horas_mudo").toInt();
 
     // ── Agenda por dia ──
     // Para cada dia lê o radio (modo) e os selects de horário (se modo = DIA_HORARIO)
@@ -550,7 +542,6 @@ void handleConfigSensor() {
         s.temp_critica              = s.temp_max_alerta + 5.0; // 5°C acima do alerta
         s.tempo_degelo_min          = 40;  // 40 min — cobre ciclos de degelo normais (~30 min + margem)
         s.tempo_espera_critico_min  = 15;  // 15 min — crítico é urgente, paciência menor
-        s.horas_mudo_padrao         = 1;   // botão manutenção = 1h
         // ── Agenda por dia: padrão = todos os dias em 24h ──
         // O usuário pode ajustar depois na página de edição
         for (int i = 0; i < 7; i++) {

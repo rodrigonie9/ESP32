@@ -47,7 +47,6 @@ static void gravarNoNVS(){
         obj["tempo_espera_critico_min"] = s.tempo_espera_critico_min;
         obj["monitoramento_ativo"]  = s.monitoramento_ativo;
         obj["mudo_ate"]             = (long)s.mudo_ate;
-        obj["horas_mudo_padrao"]    = s.horas_mudo_padrao;
         
         // ── AGENDA POR DIA ──
         // Salva os 5 arrays, de 7 posições, como listas JSON
@@ -105,7 +104,6 @@ void registry_iniciar () {
             s.tempo_espera_critico_min  = obj["tempo_espera_critico_min"].as<uint16_t>();
             s.monitoramento_ativo = obj["monitoramento_ativo"].as<bool>();
             s.mudo_ate            = (time_t)obj["mudo_ate"].as<long>();  // 0 = não está em manutenção
-            s.horas_mudo_padrao   = obj["horas_mudo_padrao"].as<uint8_t>();
             
     
             // ── AGENDA POR DIA ──

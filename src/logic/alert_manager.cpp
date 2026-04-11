@@ -120,8 +120,8 @@ static Preferences prefsAlerta;
 // Enquanto o problema não for resolvido, o sistema continua avisando nestes intervalos
 // UL = unsigned long — necessário para multiplicações grandes sem overflow
 // 60000UL = 1 minuto em milissegundos
-const unsigned long REPETICAO_SUAVE_S   = 1UL * 60UL;  // avisa a cada 30 min se ainda em alerta
-const unsigned long REPETICAO_CRITICO_S = 1UL * 60UL;  // avisa a cada 10 min se ainda crítico
+const unsigned long REPETICAO_SUAVE_S   = 30UL * 60UL;  // avisa a cada 30 min se ainda em alerta
+const unsigned long REPETICAO_CRITICO_S = 10L * 60UL;  // avisa a cada 10 min se ainda crítico
 
 
 // ── ESTADO DE ALERTA POR SENSOR ───────────────────────────────────────────────

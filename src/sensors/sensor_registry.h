@@ -36,7 +36,6 @@ struct SensorConfig {
     uint16_t tempo_espera_critico_min;  // Tempo de paciência antes de avisar crítico
     bool monitoramento_ativo;       // Monitoramento ligado / desligado
     time_t mudo_ate;                // Unix timestamp até quando está em manutenção (0 = normal)
-    uint8_t horas_mudo_padrao;      // Duração botão de silencio (1h, 2h,....24h)
 
 // ── AGENDA POR DIA// ──────────────────────────────────────────
 // Índice: 0=Domingo, 1=Segunda, 2=Terça, 3=Quarta, 4=Quinta, 5=Sexta, 6=Sábado
