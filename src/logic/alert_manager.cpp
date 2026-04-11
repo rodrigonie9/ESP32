@@ -120,7 +120,7 @@ static Preferences prefsAlerta;
 // Enquanto o problema não for resolvido, o sistema continua avisando nestes intervalos
 // UL = unsigned long — necessário para multiplicações grandes sem overflow
 // 60000UL = 1 minuto em milissegundos
-const unsigned long REPETICAO_SUAVE_S   = 30UL * 60UL;  // avisa a cada 30 min se ainda em alerta
+const unsigned long REPETICAO_SUAVE_S   = 1UL * 60UL;  // avisa a cada 30 min se ainda em alerta
 const unsigned long REPETICAO_CRITICO_S = 1UL * 60UL;  // avisa a cada 10 min se ainda crítico
 
 
@@ -393,6 +393,11 @@ void processarLogicaAlertas() {
                                           "Sensor: " + s.nome_amigavel + "\n"
                                           "Verifique a conexão do cabo.");
                     e.erroAvisado = true;
+                    // DECISÃO DE DESIGN: avisa UMA VEZ por sessão (erroAvisado fica true).
+                    // Não repete enquanto a placa estiver ligada — problema é binário (tá ou não tá).
+                    // Após o reboot diário (12h), erroAvisado zera na RAM e o ciclo recomeça:
+                    // se o sensor ainda estiver offline, avisa novamente após 5 ciclos.
+                    // Resultado: mínimo 1 aviso por dia enquanto o sensor estiver desconectado.
                 }
             } else if (s.id_sensor < MAX_SENSORES) {
                 // ── Caso especial: sensor cadastrado mas NÃO estava no barramento no boot ──

@@ -79,13 +79,16 @@ Antes de escrever qualquer código, verificar mentalmente:
 - ✅ 1.6 Agenda OFF durante alerta ativo (timers zerados na RAM e NVS)
 - ✅ 1.7 Manutenção silencia sem resetar timers
 - ✅ 1.8 NTP falha → monitora por padrão (timers do NVS descartados, agendas ignoradas)
-- **⏳ PRÓXIMO: 1.9** — Boundary exato no limiar suave
-- ⬜ 1.10 Boundary exato no limiar crítico
-- ⬜ 1.11 Múltiplos sensores em alerta simultâneo
-- ⬜ 1.12 Repetição suave a cada 30 min
-- ⬜ 1.13 Repetição crítico a cada 10 min
+- ✅ 1.9 Boundary exato no limiar suave (condição > confirmada)
+- ✅ 1.10 Boundary exato no limiar crítico (condição >= confirmada)
+- ✅ 1.11 Múltiplos sensores em alerta simultâneo
+- ✅ 1.12 Repetição suave a cada 30 min
+- ✅ 1.13 Repetição crítico a cada 10 min
+
+### Grupo 1 — CONCLUÍDO ✅ (11/04/2026)
 
 ### Grupos 2–12 — todos pendentes
+- **⏳ PRÓXIMO: Grupo 2** — Sensor offline (desconectar sensor fisicamente)
 - Grupo 12 (Watchdog de internet): aguardando acesso ao roteador (senha TP-Link) para desligar cabo
 
 ---
@@ -93,6 +96,7 @@ Antes de escrever qualquer código, verificar mentalmente:
 ## Melhorias planejadas (não urgentes)
 
 ### Pendentes de implementação
+- **Alerta de temperatura mínima** — limiar inferior por sensor (ex: horti — temp baixa queima mercadorias); mesma lógica de timer do suave, direção contrária; campos: `temp_min_alerta` no registry, alert_manager e web portal
 - **Segurança — autenticação web portal** (HTTP Basic Auth ou formulário)
 - **Apps Script Google Sheets** — arquivamento mensal, histórico por abas
 - **Token pelo WiFiManager** — distribuir .bin sem recompilar (token + chatID no portal captivo)
