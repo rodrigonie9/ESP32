@@ -132,7 +132,8 @@
       // Retorna o código HTTP da resposta (200 = OK, -1 = erro de conexão)
       int httpCode = http.POST(jsonStr);
 
-      if (httpCode == HTTP_CODE_OK) {
+      // 200 = sucesso direto | 302 = redirect do Google (dado já foi recebido antes do redirect)
+      if (httpCode == HTTP_CODE_OK || httpCode == 302) {
           LOG("Logger: enviado ao Google Sheets com sucesso.");
       } else {
           LOG("Logger: falha no envio. Codigo HTTP: " + String(httpCode));
