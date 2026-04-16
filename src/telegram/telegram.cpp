@@ -122,12 +122,16 @@ if (!pedidoOTA &&
   // Exemplo: "/update acougue" → apenas a placa "acougue" reage
   String cmdEspecifico = "/update " + nomePlaca;
 
-  // Broadcast: "/update" sozinho (no JSON termina com aspas: "/update")
-  // Todas as placas respondem
-  // Nota: verificamos a aspa final para não confundir "/update" com "/update nome"
-  String cmdBroadcast = "/update\"";
+  // Broadcast: "/update" sozinho, sem argumento
+  // Detectado pela ausência de espaço após "/update"
+  // Se tem espaço → tem argumento → não é broadcast
+  bool ehBroadcast  = payload.indexOf("/update") != -1 &&
+                      payload.indexOf("/update ") == -1;
 
-  if (payload.indexOf(cmdEspecifico) != -1 || payload.indexOf(cmdBroadcast) != -1) {
+  // Específico: payload contém "/update nome_desta_placa"
+  bool ehEspecifico = payload.indexOf(cmdEspecifico) != -1;
+
+  if (ehEspecifico || ehBroadcast) {
     pedidoOTA = true;
     // snprintf monta a mensagem num buffer fixo — seguro para RAM da ESP32
     char buf[80];

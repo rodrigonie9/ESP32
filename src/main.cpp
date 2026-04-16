@@ -64,7 +64,7 @@ bool horaEstaSincronizada = false;
 
 // ====================== CONTROLE DE TEMPO ======================
 unsigned long ultimoEnvio = 0;              // Guarda o tempo do último envio
-const unsigned long INTERVALO = 30000;      //  
+const unsigned long INTERVALO = 120000;      //  
 
 
 
