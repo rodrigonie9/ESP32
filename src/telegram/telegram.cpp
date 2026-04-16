@@ -114,14 +114,26 @@ void verificarMensagensTelegram() {
   http.end();
 
 if (!pedidoOTA &&
-      payload.indexOf(CHAT_AUTORIZADO) != -1 &&
-      payload.indexOf("/update") != -1) {
+      payload.indexOf(CHAT_AUTORIZADO) != -1) {
 
-  pedidoOTA = true;
-  // snprintf monta a mensagem num buffer fixo — seguro para RAM da ESP32
-  char buf[80];
-  snprintf(buf, sizeof(buf), "[%s] Comando /update recebido. Aguardando...", getNomePlaca().c_str());
-  enviarMensagemTelegram(buf);
+  String nomePlaca = getNomePlaca();
+
+  // Comando específico: "/update nome_da_placa" — só esta placa responde
+  // Exemplo: "/update acougue" → apenas a placa "acougue" reage
+  String cmdEspecifico = "/update " + nomePlaca;
+
+  // Broadcast: "/update" sozinho (no JSON termina com aspas: "/update")
+  // Todas as placas respondem
+  // Nota: verificamos a aspa final para não confundir "/update" com "/update nome"
+  String cmdBroadcast = "/update\"";
+
+  if (payload.indexOf(cmdEspecifico) != -1 || payload.indexOf(cmdBroadcast) != -1) {
+    pedidoOTA = true;
+    // snprintf monta a mensagem num buffer fixo — seguro para RAM da ESP32
+    char buf[80];
+    snprintf(buf, sizeof(buf), "[%s] Comando /update recebido. Aguardando...", nomePlaca.c_str());
+    enviarMensagemTelegram(buf);
+  }
 }
 
   // procura último "update_id" para o número
