@@ -66,6 +66,7 @@ bool horaEstaSincronizada = false;
 unsigned long ultimoEnvio = 0;              // Guarda o tempo do último envio
 const unsigned long INTERVALO = 120000;      //  
 
+//a
 
 
 void setup() {
